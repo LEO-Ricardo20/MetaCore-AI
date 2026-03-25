@@ -19,8 +19,10 @@ const CHIP_DEFS: Record<string, { name: string; totalPins: number; leftPins: str
   'ESP32-S3': {
     name: 'ESP32-S3-WROOM-1',
     totalPins: 38,
-    leftPins: ['GND', '3V3', 'EN', 'IO0', 'IO1', 'IO2', 'IO3', 'IO4', 'IO5', 'IO6', 'IO7', 'IO8', 'IO9', 'IO10', 'IO11', 'IO12', 'IO13', 'IO14', '3V3'],
-    rightPins: ['GND', 'IO46', 'IO45', 'IO44', 'IO43', 'IO42', 'IO41', 'IO40', 'IO39', 'IO38', 'IO37', 'IO36', 'IO35', 'IO34', 'IO33', 'IO32', 'IO21', 'IO20', 'GND'],
+    // 左侧 1-19 脚（从上到下）：对照乐鑫官方 ESP32-S3-WROOM-1 Datasheet Pin Layout
+    leftPins:  ['GND', '3V3', 'EN', 'IO0', 'IO1', 'IO2', 'IO3', 'IO4', 'IO5', 'IO6', 'IO7', 'IO8', 'IO9', 'IO10', 'IO11', 'IO12', 'IO13', 'IO14', '3V3'],
+    // 右侧 20-38 脚（从上到下）：IO32-IO37 被 Flash/PSRAM 占用，模块未引出
+    rightPins: ['GND', 'IO46', 'IO45', 'IO44', 'IO43', 'IO42', 'IO41', 'IO40', 'IO39', 'IO38', 'IO21', 'IO20', 'IO19', 'IO18', 'IO17', 'IO16', 'IO15', 'GND', 'GND'],
   },
   'STM32F103': {
     name: 'STM32F103C8T6',
@@ -33,6 +35,12 @@ const CHIP_DEFS: Record<string, { name: string; totalPins: number; leftPins: str
     totalPins: 100,
     leftPins: ['VBAT', 'PC13', 'PC14', 'PC15', 'PI8', 'PI9', 'PI10', 'PI11', 'VCAP', 'VSSA', 'VDDA', 'PA0', 'PA1', 'PA2', 'PA3', 'PA4', 'PA5', 'PA6', 'PA7', 'PB0', 'PB1', 'PB2', 'PF0', 'PF1', 'PF2', 'PF3', 'PF4', 'PF5', 'PF6', 'PF7', 'PF8', 'PF9', 'PF10', 'PF11', 'PF12', 'PF13', 'PF14', 'PF15', 'PG0', 'PG1', 'VSS', 'VDD', 'PA8', 'PA9', 'PA10', 'PA11', 'PA12', 'PA13'],
     rightPins: ['PC0', 'PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8', 'PC9', 'PC10', 'PC11', 'PC12', 'PD0', 'PD1', 'PD2', 'PD3', 'PD4', 'PD5', 'PD6', 'PD7', 'PD8', 'PD9', 'PD10', 'PD11', 'PD12', 'PD13', 'PD14', 'PD15', 'PG2', 'PG3', 'PG4', 'PG5', 'PG6', 'PG7', 'PG8', 'VSS', 'VDD', 'PG9', 'PG10', 'PG11', 'PG12', 'PG13', 'PG14', 'PG15', 'PB3', 'PB4', 'PB5', 'PB6', 'PB7'],
+  },
+  'STM32F103-KIT': {
+    name: 'STM32F103C8T6 (KEYSKING学习板)',
+    totalPins: 48,
+    leftPins:  ['VBAT', 'PC13', 'PC14', 'PC15', 'PD0', 'PD1', 'NRST', 'VSSA', 'VDDA', 'PA0', 'PA1', 'PA2', 'PA3', 'PA4', 'PA5', 'PA6', 'PA7', 'PB0', 'PB1', 'PB2', 'PB10', 'PB11', 'VSS', 'VDD'],
+    rightPins: ['PB12', 'PB13', 'PB14', 'PB15', 'PA8', 'PA9', 'PA10', 'PA11', 'PA12', 'PA13', 'PA14', 'PA15', 'PB3', 'PB4', 'PB5', 'PB6', 'PB7', 'PB8', 'PB9', 'VSS', 'VDD', 'PC0', 'PC1', 'BOOT0'],
   },
 }
 

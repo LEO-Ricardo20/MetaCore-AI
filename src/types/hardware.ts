@@ -1,9 +1,9 @@
 /** 硬件相关类型定义 — 芯片规格、引脚分配、BOM、接线 */
 
 export type ChipTarget = string
-export const PRESET_CHIPS: string[] = ['ESP32', 'ESP32-S3', 'STM32F103', 'STM32F4']
+export const PRESET_CHIPS: string[] = ['ESP32', 'ESP32-S3', 'STM32F103', 'STM32F4', 'STM32F103-KIT']
 
-export type ProjectFormat = 'espidf' | 'arduino' | 'platformio'
+export type ProjectFormat = 'espidf' | 'arduino' | 'platformio' | 'cubeide'
 
 /** GPIO 引脚定义 */
 export interface GpioPin {

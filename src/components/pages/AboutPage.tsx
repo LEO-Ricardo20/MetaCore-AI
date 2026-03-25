@@ -15,9 +15,10 @@ const FEATURES = [
 
 const CHIPS = [
   { name: 'ESP32', pins: 38, core: '双核 Xtensa LX6', freq: '240MHz', feature: 'WiFi + Bluetooth' },
-  { name: 'ESP32-S3', pins: 44, core: '双核 Xtensa LX7', freq: '240MHz', feature: 'WiFi + BLE + AI 加速' },
+  { name: 'ESP32-S3', pins: 38, core: '双核 Xtensa LX7', freq: '240MHz', feature: 'WiFi + BLE + AI 加速 + 16MB Flash + 8MB PSRAM' },
   { name: 'STM32F103', pins: 48, core: 'ARM Cortex-M3', freq: '72MHz', feature: '低成本工业控制' },
   { name: 'STM32F4', pins: 64, core: 'ARM Cortex-M4 + FPU', freq: '168MHz', feature: 'DSP + 浮点运算' },
+  { name: 'STM32F103-KIT', pins: 48, core: 'ARM Cortex-M3', freq: '72MHz', feature: 'KEYSKING学习板，含OLED/AHT20/蜂鸣器/电机等全套外设' },
 ]
 
 const TECH_STACK = [
@@ -64,7 +65,7 @@ export default function AboutPage() {
             isDark ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
           )}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            v1.5.1
+            v1.5.6
           </div>
         </div>
 

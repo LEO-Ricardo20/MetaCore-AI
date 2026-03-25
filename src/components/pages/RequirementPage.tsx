@@ -15,13 +15,18 @@ import PinTable from '@/components/requirement/PinTable'
 import PinDiagram from '@/components/requirement/PinDiagram'
 import BOMTable from '@/components/requirement/BOMTable'
 import WiringTable from '@/components/requirement/WiringTable'
-import { Loader2, AlertCircle, ChevronRight, Cpu, Sparkles, MapPin, Table2, Settings2, Info } from 'lucide-react'
+import { Loader2, AlertCircle, ChevronRight, Cpu, Sparkles, MapPin, Table2, Settings2, Info, ChevronDown, Layers, Check, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DRIVER_TEMPLATES } from '@/data/driverTemplates'
+import { useSettingsStore } from '@/store/settingsStore'
+import { runCodegen } from '@/services/ai/codegen'
+import { runFlowgen } from '@/services/ai/flowgen'
 
 const FORMATS: { value: ProjectFormat; label: string; desc: string }[] = [
   { value: 'espidf', label: 'ESP-IDF', desc: 'CMake' },
   { value: 'arduino', label: 'Arduino', desc: '.ino' },
   { value: 'platformio', label: 'PlatformIO', desc: 'ini' },
+  { value: 'cubeide', label: 'STM32CubeIDE', desc: '.ioc' },
 ]
 
 const EXAMPLES = [
@@ -36,6 +41,7 @@ export default function RequirementPage() {
   const { getActive } = useAIConfigStore()
   const { getAllChipNames, getSpec } = useChipStore()
   const { theme } = useThemeStore()
+  const { autoPipeline, setAutoPipeline } = useSettingsStore()
   const isDark = theme === 'dark'
 
   // 合并预置 + 自定义芯片列表
@@ -46,30 +52,59 @@ export default function RequirementPage() {
   const [format, setFormat] = useState<ProjectFormat>(project?.format ?? 'espidf')
   const [error, setError] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'diagram'>('diagram')
+  const [driverPanelOpen, setDriverPanelOpen] = useState(false)
+  const [pickedDriverIds, setPickedDriverIds] = useState<string[]>(project?.selectedDriverIds ?? [])
+  const [pipelineStep, setPipelineStep] = useState<'' | 'scheme' | 'code' | 'flow'>('')
 
-  /** 调用 AI 生成硬件方案 */
+  function toggleDriver(id: string) {
+    setPickedDriverIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  /** 调用 AI 生成硬件方案（含一键流水线） */
   async function handleGenerate() {
     if (!req.trim()) return
     const svc = getActive()
     if (!svc) { setError('请先在设置页配置并选择 AI 服务'); return }
     setError('')
-    createProject(req, target, format)
+    // 修复：将手选驱动一起传入 createProject，避免被覆盖
+    createProject(req, target, format, pickedDriverIds)
     setGenerating('scheme', true)
+    let scheme: HardwareScheme | null = null
     try {
-      // 获取芯片规格（支持自定义芯片）
       const chipSpec = getSpec(target) ?? undefined
       const prompt = buildSchemePrompt(req, target, chipSpec)
       const raw = await callAI(svc, [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user }
       ], { temperature: 0.2 })
-      const scheme = parseJSON<HardwareScheme>(raw)
+      scheme = parseJSON<HardwareScheme>(raw)
       if (!scheme) throw new Error('AI 返回格式解析失败，请重试')
       setScheme(scheme)
     } catch (e: any) {
       setError(e.message)
+      return
     } finally {
       setGenerating('scheme', false)
+    }
+    // 一键流水线：方案完成后自动生成代码 → 流程图
+    if (autoPipeline && scheme) {
+      try {
+        setPipelineStep('code')
+        const currentProject = useProjectStore.getState().project!
+        const chipSpec = getSpec(target) ?? undefined
+        const codeResult = await runCodegen(svc, currentProject, chipSpec)
+        useProjectStore.getState().setCodeFiles(codeResult.files)
+        setPipelineStep('flow')
+        const flowResult = await runFlowgen(svc, codeResult.files)
+        useProjectStore.getState().setFlowData(flowResult.nodes, flowResult.edges)
+        navigate('/flow')
+      } catch (e: any) {
+        setError('流水线中断：' + e.message)
+      } finally {
+        setPipelineStep('')
+      }
     }
   }
 
@@ -159,6 +194,76 @@ export default function RequirementPage() {
             ))}
           </div>
 
+          {/* 驱动预选面板 */}
+          <div className="mt-3">
+            <button
+              onClick={() => setDriverPanelOpen(v => !v)}
+              className={cn(
+                'flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all duration-150',
+                isDark
+                  ? 'text-orange-400 hover:bg-orange-500/10'
+                  : 'text-orange-600 hover:bg-orange-500/10'
+              )}
+            >
+              <Layers size={13} />
+              手动预选外设驱动
+              {pickedDriverIds.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-[10px] font-bold">{pickedDriverIds.length}</span>
+              )}
+              {driverPanelOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+
+            {driverPanelOpen && (
+              <div className={cn(
+                'mt-2 p-3 rounded-xl border flex flex-wrap gap-2',
+                isDark ? 'bg-slate-800/50 border-slate-700/40' : 'bg-slate-50 border-slate-200'
+              )}>
+                {DRIVER_TEMPLATES.map(d => {
+                  const picked = pickedDriverIds.includes(d.id)
+                  const color = { I2C: 'indigo', SPI: 'violet', GPIO: 'emerald', UART: 'cyan' }[d.interface] ?? 'slate'
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => toggleDriver(d.id)}
+                      className={cn(
+                        'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all duration-150 font-medium',
+                        picked
+                          ? `bg-${color}-500/15 border-${color}-500/50 text-${color}-400`
+                          : isDark
+                            ? 'bg-slate-700/40 border-slate-600/40 text-slate-400 hover:border-slate-500'
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                      )}
+                    >
+                      {picked && <Check size={10} className={`text-${color}-400`} />}
+                      {d.name}
+                      <span className="text-[10px] opacity-60">{d.interface}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 一键式生成开关 */}
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none',
+            autoPipeline
+              ? (isDark ? 'bg-violet-500/15 border-violet-500/30 text-violet-300' : 'bg-violet-50 border-violet-300 text-violet-700')
+              : (isDark ? 'bg-slate-800/60 border-slate-700/40 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400')
+          )} onClick={() => setAutoPipeline(!autoPipeline)} title="一键式生成：开启后点「生成方案」将自动串行完成 方案→代码→流程图 三步，无需逐步手动点击">
+            <Zap size={12} className={autoPipeline ? 'text-violet-400' : 'text-slate-500'} />
+            <span className="text-xs font-medium">一键生成</span>
+            <div className={cn(
+              'w-7 h-3.5 rounded-full transition-all relative',
+              autoPipeline ? 'bg-violet-500' : (isDark ? 'bg-slate-700' : 'bg-slate-300')
+            )}>
+              <div className={cn(
+                'absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-all',
+                autoPipeline ? 'left-3.5' : 'left-0.5'
+              )} />
+            </div>
+          </div>
+
           {/* 生成按钮 */}
           <button
             onClick={handleGenerate}
@@ -166,8 +271,8 @@ export default function RequirementPage() {
             className="ml-auto flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
           >
             {isGeneratingScheme
-              ? <><Loader2 size={15} className="animate-spin" /> AI 生成中...</>
-              : <><Sparkles size={15} /> 生成方案</>
+              ? <><Loader2 size={15} className="animate-spin" /> {pipelineStep === 'code' ? '生成代码中...' : pipelineStep === 'flow' ? '生成流程图...' : 'AI 生成中...'}</>
+              : <><Sparkles size={15} /> {autoPipeline ? '一键生成' : '生成方案'}</>
             }
           </button>
         </div>

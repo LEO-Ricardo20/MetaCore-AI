@@ -39,6 +39,7 @@ export interface Project {
   target: ChipTarget
   format: ProjectFormat
   scheme?: HardwareScheme
+  selectedDriverIds?: string[]
   codeFiles: CodeFile[]
   flowNodes: FlowNode[]
   flowEdges: FlowEdge[]

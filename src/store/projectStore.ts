@@ -11,12 +11,13 @@ interface ProjectState {
   isGeneratingFlow: boolean
   selectedFile: string | null
   // 同步到 projectsStore
-  createProject: (requirement: string, target: ChipTarget, format: ProjectFormat) => void
+  createProject: (requirement: string, target: ChipTarget, format: ProjectFormat, selectedDriverIds?: string[]) => void
   setScheme: (scheme: HardwareScheme) => void
   setCodeFiles: (files: CodeFile[]) => void
   setFlowData: (nodes: FlowNode[], edges: FlowEdge[]) => void
   setSelectedFile: (path: string) => void
   setGenerating: (key: 'scheme' | 'code' | 'flow', val: boolean) => void
+  setSelectedDriverIds: (ids: string[]) => void
   saveProject: (updates: Partial<Project>) => void
   loadProject: (id: string) => void
   reset: () => void
@@ -31,13 +32,14 @@ export const useProjectStore = create<ProjectState>()(
       isGeneratingFlow: false,
       selectedFile: null,
 
-      createProject: (requirement, target, format) => {
+      createProject: (requirement, target, format, selectedDriverIds) => {
         const project: Project = {
           id: Date.now().toString(),
           name: requirement.slice(0, 30) || '未命名项目',
           requirement,
           target,
           format,
+          selectedDriverIds: selectedDriverIds ?? [],
           codeFiles: [],
           flowNodes: [],
           flowEdges: [],
@@ -73,6 +75,14 @@ export const useProjectStore = create<ProjectState>()(
         }),
 
       setSelectedFile: (selectedFile) => set({ selectedFile }),
+
+      setSelectedDriverIds: (ids) =>
+        set((s) => {
+          if (!s.project) return s
+          const updated = { ...s.project, selectedDriverIds: ids, updatedAt: Date.now() }
+          useProjectsStore.getState().updateProject(updated.id, { selectedDriverIds: ids })
+          return { project: updated }
+        }),
 
       setGenerating: (key, val) =>
         set({

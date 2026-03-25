@@ -13,7 +13,8 @@ import type { CodeFile } from '@/types/project'
 import FileTree from '@/components/codegen/FileTree'
 import CodePreview from '@/components/codegen/CodePreview'
 import ExportButtons from '@/components/codegen/ExportButtons'
-import { Loader2, Code2, AlertCircle, AlertTriangle, Sparkles } from 'lucide-react'
+import { Loader2, Code2, AlertCircle, AlertTriangle, Sparkles, Cpu } from 'lucide-react'
+import { matchDriverTemplates, DRIVER_TEMPLATES } from '@/data/driverTemplates'
 import { cn } from '@/lib/utils'
 
 export default function CodegenPage() {
@@ -101,13 +102,41 @@ export default function CodegenPage() {
           )}>
             <Code2 size={15} className={isDark ? 'text-violet-400' : 'text-violet-500'} />
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             <span className={cn('text-sm font-semibold', isDark ? 'text-white' : 'text-slate-800')}>
               {project.name}
             </span>
-            <span className={cn('ml-2 text-xs', isDark ? 'text-slate-500' : 'text-slate-400')}>
+            <span className={cn('text-xs', isDark ? 'text-slate-500' : 'text-slate-400')}>
               {project.target} · {project.format}
             </span>
+            {project.scheme && (() => {
+              const autoMatched = matchDriverTemplates(project.scheme!)
+              const manualSelected = DRIVER_TEMPLATES.filter(d =>
+                (project.selectedDriverIds ?? []).includes(d.id)
+              )
+              const matched = [...new Map(
+                [...autoMatched, ...manualSelected].map(d => [d.id, d])
+              ).values()]
+              return matched.length > 0 ? (
+                <span className={cn(
+                  'flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md border font-medium',
+                  isDark
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                )}>
+                  <Cpu size={9} />
+                  {matched.map(d => {
+                    const labels: Record<string, string> = {
+                      ssd1306: 'SSD1306', dht: 'DHT',
+                      aht20: 'AHT20', ws2812: 'WS2812',
+                      hcsr04: 'HC-SR04', buzzer: '蜂鸣器',
+                      servo: '舵机', drv8833: 'DRV8833',
+                    }
+                    return labels[d.id] ?? d.id
+                  }).join(' · ')} 驱动已注入
+                </span>
+              ) : null
+            })()}
           </div>
         </div>
         <div className="flex items-center gap-3">

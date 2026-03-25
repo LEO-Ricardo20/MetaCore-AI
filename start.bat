@@ -3,7 +3,7 @@ chcp 65001 >nul
 cd /d "%~dp0"
 echo.
 echo   ╔══════════════════════════════════════╗
-echo   ║       MetaCore AI v1.5 启动中...     ║
+echo   ║      MetaCore AI v1.5.2 启动中...     ║
 echo   ╚══════════════════════════════════════╝
 echo.
 

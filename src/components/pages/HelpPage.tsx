@@ -13,7 +13,7 @@ const SECTIONS = [
       { title: '配置 AI 服务', desc: '在「设置」页面添加你的 API Key，支持 DeepSeek、硅基流动、通义千问、OpenAI、Ollama。配置完成后点击「测试」验证连接。' },
       { title: '输入硬件需求', desc: '在「方案」页面输入你想要实现的硬件功能。例如：「做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测温湿度」。' },
       { title: '生成硬件方案', desc: '选择目标芯片（支持预置和自定义芯片）和工程格式（ESP-IDF/Arduino/PlatformIO），点击「生成方案」。AI 基于芯片完整技术规格（引脚/外设/限制）生成精准方案。' },
-      { title: '生成代码工程', desc: '点击「生成工程代码」，AI 根据方案和芯片规格生成模块化代码，生成后自动进行一致性自检。' },
+      { title: '生成代码工程', desc: '点击「生成工程代码」，AI 根据方案和芯片规格生成模块化代码，生成后自动进行一致性自检。当方案中包含 SSD1306 OLED 或 DHT 温湿度传感器时，系统会自动注入经验证的驱动模板，代码页顶栏会显示绿色「驱动已注入」标签，生成的驱动代码可直接上板编译。' },
       { title: '导出使用', desc: '点击「导出 ZIP」下载完整工程包，或点击「导出 PDF」获取方案文档。BOM 价格仅供参考。' },
       { title: '自定义芯片', desc: '点击侧边栏「芯片」进入芯片管理，支持三种方式添加自定义芯片：AI 识图（上传 PDF）、AI 助填、手动配置。' },
       { title: '了解更多', desc: '点击侧边栏「关于」查看平台功能特性、技术栈、版权信息及免责声明。' },
@@ -58,6 +58,54 @@ const SECTIONS = [
 ]
 
 const CHANGELOG = [
+  {
+    version: 'v1.5.6',
+    date: '2026-03-25',
+    badge: 'cyan',
+    changes: [
+      '修复：手动预选驱动在点击「生成方案」后丢失的 bug（createProject 现在保留 selectedDriverIds）',
+      '新增：一键式生成开关 — 开启后点「生成方案」自动串行完成 方案→代码→流程图 三步无需逐步手动点击，开关状态跨会话记忆',
+    ],
+  },
+  {
+    version: 'v1.5.5',
+    date: '2026-03-25',
+    badge: 'violet',
+    changes: [
+      '新增：STM32CubeIDE 工程格式支持 — 生成 .ioc / HAL 标准骨架，适合在 STM32CubeIDE 内 debug',
+      '新增：OpenAI Responses API 双协议适配 — 服务商为 OpenAI 时自动切换新协议，其余服务商保持 Chat Completions 兼容',
+    ],
+  },
+  {
+    version: 'v1.5.4',
+    date: '2026-03-25',
+    badge: 'orange',
+    changes: [
+      '新增：方案页「手动预选驱动」折叠面板 — 生成方案前可手动勾选外设驱动，代码生成时与自动匹配结果去重合并',
+      '新增：驱动选择计数徽章，选中驱动数实时显示在折叠标题',
+    ],
+  },
+  {
+    version: 'v1.5.3',
+    date: '2026-03-25',
+    badge: 'rose',
+    changes: [
+      '新增：STM32F103-KIT 预置芯片（KEYSKING 学习板，STM32F103C8T6 LQFP-48），含完整外设引脚分配',
+      '新增：6 个外设驱动模板 — AHT20 温湿度、WS2812 RGB LED、HC-SR04 超声波、无源蜂鸣器、舵机 PWM、DRV8833 电机驱动',
+      '新增：外设驱动库浏览页（侧边栏「外设库」），支持按接口类型筛选、折叠展开查看代码',
+    ],
+  },
+  {
+    version: 'v1.5.2',
+    date: '2026-03-24',
+    badge: 'emerald',
+    changes: [
+      '新增：SSD1306 OLED 驱动模板库 — ESP-IDF/Arduino/PlatformIO 三框架完整驱动（I2C 初始化、6x8 字模渲染、flush 机制）',
+      '新增：DHT11/DHT22 驱动模板库 — ESP-IDF 手写单总线时序，Arduino/PlatformIO 使用 Adafruit DHT 库，含 NaN 保护与采样间隔约束',
+      '新增：代码页顶栏驱动模板指示器 — 自动检测方案中的 OLED/DHT 外设，显示绿色「驱动已注入」标签',
+      '优化：代码生成 Prompt 自动注入匹配驱动模板，AI 基于验证代码组装而非自由编写，大幅提升生成代码可用性',
+    ],
+  },
   {
     version: 'v1.5.1',
     date: '2026-03-21',
@@ -280,6 +328,7 @@ export default function HelpPage() {
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> ESP-IDF 格式生成的代码最完整，包含 CMakeLists</li>
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 引脚图悬停可查看详细连接信息</li>
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 项目数据保存在本地浏览器，换设备需导出</li>
+                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 包含 SSD1306 OLED 或 DHT 温湿度的方案会自动注入驱动模板，生成代码可直接上板编译</li>
               </ul>
             </div>
           </div>

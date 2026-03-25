@@ -10,6 +10,7 @@ import ProjectManager from '@/components/project/ProjectManager'
 import HelpPage from '@/components/pages/HelpPage'
 import AboutPage from '@/components/pages/AboutPage'
 import ChipManager from '@/components/chips/ChipManager'
+import DriversPage from '@/components/drivers/DriversPage'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="codegen" element={<CodegenPage />} />
           <Route path="flow" element={<FlowPage />} />
           <Route path="chips" element={<ChipManager />} />
+          <Route path="drivers" element={<DriversPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="help" element={<HelpPage />} />
           <Route path="about" element={<AboutPage />} />

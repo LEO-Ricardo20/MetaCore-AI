@@ -1,7 +1,7 @@
 /** 侧边栏导航 — 包含路由链接、主题切换和版本号 */
 
 import { NavLink } from 'react-router-dom'
-import { Cpu, Code2, GitBranch, Settings, Zap, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon } from 'lucide-react'
+import { Cpu, Code2, GitBranch, Settings, Zap, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon, Layers } from 'lucide-react'
 import { useThemeStore } from '@/store/themeStore'
 import { cn } from '@/lib/utils'
 
@@ -11,6 +11,7 @@ const nav = [
   { to: '/codegen', icon: Code2, label: '代码', color: 'violet' },
   { to: '/flow', icon: GitBranch, label: '流程', color: 'fuchsia' },
   { to: '/chips', icon: CircuitBoard, label: '芯片', color: 'rose' },
+  { to: '/drivers', icon: Layers, label: '外设库', color: 'orange' },
   { to: '/settings', icon: Settings, label: '设置', color: 'slate' },
   { to: '/help', icon: BookOpen, label: '帮助', color: 'amber' },
   { to: '/about', icon: Info, label: '关于', color: 'emerald' },
@@ -22,6 +23,7 @@ const colorMap: Record<string, { active: string; dot: string }> = {
   violet: { active: 'bg-violet-500/15 text-violet-400', dot: 'bg-violet-400' },
   fuchsia: { active: 'bg-fuchsia-500/15 text-fuchsia-400', dot: 'bg-fuchsia-400' },
   rose: { active: 'bg-rose-500/15 text-rose-400', dot: 'bg-rose-400' },
+  orange: { active: 'bg-orange-500/15 text-orange-400', dot: 'bg-orange-400' },
   slate: { active: 'bg-slate-500/15 text-slate-400', dot: 'bg-slate-400' },
   amber: { active: 'bg-amber-500/15 text-amber-400', dot: 'bg-amber-400' },
   emerald: { active: 'bg-emerald-500/15 text-emerald-400', dot: 'bg-emerald-400' },
@@ -92,7 +94,7 @@ export default function Sidebar() {
       </button>
 
       {/* 底部版本 */}
-      <div className={cn('mt-2 text-[9px] font-mono', isDark ? 'text-slate-700' : 'text-indigo-300')}>v1.5.1</div>
+      <div className={cn('mt-2 text-[9px] font-mono', isDark ? 'text-slate-700' : 'text-indigo-300')}>v1.5.6</div>
     </aside>
   )
 }

@@ -9,6 +9,7 @@ import type { HardwareScheme } from '@/types/project'
 import type { ChipTarget, ProjectFormat, ChipSpec } from '@/types/hardware'
 import { chipSpecToPromptText, getChipSpec } from '@/data/chipSpecs'
 import { codeTemplateToPromptText } from '@/data/codeTemplates'
+import { matchDriverTemplates, driverTemplatesToPromptText } from '@/data/driverTemplates'
 
 /** prompt 消息对（system + user） */
 export interface PromptPair {
@@ -103,6 +104,8 @@ export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, f
   const spec = customSpec ?? getChipSpec(target)
   const chipText = spec ? chipSpecToPromptText(spec) : `目标芯片：${target}`
   const templateText = codeTemplateToPromptText(format)
+  const matchedDrivers = matchDriverTemplates(scheme)
+  const driverText = driverTemplatesToPromptText(matchedDrivers, format)
 
   return {
     system: `你是一位资深嵌入式 C/C++ 工程师，专精 ${target} 固件开发。
@@ -115,6 +118,8 @@ export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, f
 ${chipText}
 
 ${templateText}
+
+${driverText}
 
 ## 代码质量要求
 - 每个外设驱动独立成 .c/.h 模块

@@ -62,6 +62,23 @@ export const CODE_TEMPLATES: Record<ProjectFormat, CodeTemplate> = {
       '监视器波特率与 Serial.begin 保持一致',
     ],
   },
+  cubeide: {
+    description: 'STM32CubeIDE 工程（HAL 库 + .ioc 配置）',
+    skeleton: [
+      { path: 'Core/Src/main.c', template: `#include "main.h"\n#include "gpio.h"\n// #include "i2c.h"\n// #include "usart.h"\n\nvoid SystemClock_Config(void);\n\nint main(void) {\n    HAL_Init();\n    SystemClock_Config();\n    MX_GPIO_Init();\n    // MX_I2C1_Init();\n    // MX_USART1_UART_Init();\n\n    while (1) {\n        // 主循环\n        HAL_Delay(100);\n    }\n}` },
+      { path: 'Core/Inc/main.h', template: `#ifndef __MAIN_H\n#define __MAIN_H\n\n#include "stm32f1xx_hal.h"\n\n// 用户引脚定义（与 .ioc 保持一致）\n// #define LED_PIN GPIO_PIN_13\n// #define LED_PORT GPIOC\n\n#endif` },
+    ],
+    bestPractices: [
+      '使用 STM32CubeMX .ioc 文件管理引脚和外设配置，不要手动修改 MX_xxx_Init 函数',
+      '用户代码写在 /* USER CODE BEGIN */ 和 /* USER CODE END */ 注释块内，防止重新生成代码时被覆盖',
+      '使用 HAL_GPIO_WritePin / HAL_GPIO_ReadPin 操作 GPIO',
+      'I2C 使用 HAL_I2C_Master_Transmit / HAL_I2C_Mem_Read',
+      'UART 调试推荐重定向 printf 到 USART（重写 fputc）',
+      'PWM 使用 HAL_TIM_PWM_Start + __HAL_TIM_SET_COMPARE 设置占空比',
+      '中断回调在 HAL_xxx_Callback 弱函数中实现',
+      'SWD 调试接口（PA13/PA14）不可复用为普通 GPIO',
+    ],
+  },
 }
 
 /** 将代码模板格式化为可注入 AI prompt 的文本 */
