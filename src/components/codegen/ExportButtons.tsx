@@ -13,7 +13,7 @@ export default function ExportButtons() {
     if (!project) return
     setZipping(true)
     try {
-      await exportZip(project.name || 'metacore-project', project.codeFiles)
+      await exportZip(project.name || 'metacore-project', project.codeFiles, project.target)
     } catch (e: any) {
       alert('导出失败: ' + e.message)
     } finally {
