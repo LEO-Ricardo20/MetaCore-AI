@@ -11,6 +11,7 @@ import HelpPage from '@/components/pages/HelpPage'
 import AboutPage from '@/components/pages/AboutPage'
 import ChipManager from '@/components/chips/ChipManager'
 import DriversPage from '@/components/drivers/DriversPage'
+import LocalWorkspacePage from '@/components/local/LocalWorkspacePage'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="requirement" element={<RequirementPage />} />
           <Route path="codegen" element={<CodegenPage />} />
           <Route path="flow" element={<FlowPage />} />
+          <Route path="local" element={<LocalWorkspacePage />} />
           <Route path="chips" element={<ChipManager />} />
           <Route path="drivers" element={<DriversPage />} />
           <Route path="settings" element={<SettingsPage />} />

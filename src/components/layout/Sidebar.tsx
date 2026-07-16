@@ -1,7 +1,7 @@
 /** 侧边栏导航 — 包含路由链接、主题切换和版本号 */
 
 import { NavLink } from 'react-router-dom'
-import { Cpu, Code2, GitBranch, Settings, Zap, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon, Layers } from 'lucide-react'
+import { Cpu, Code2, GitBranch, Settings, Zap, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon, Layers, HardDrive } from 'lucide-react'
 import { useThemeStore } from '@/store/themeStore'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +10,7 @@ const nav = [
   { to: '/requirement', icon: Cpu, label: '方案', color: 'indigo' },
   { to: '/codegen', icon: Code2, label: '代码', color: 'violet' },
   { to: '/flow', icon: GitBranch, label: '流程', color: 'fuchsia' },
+  { to: '/local', icon: HardDrive, label: '本地', color: 'teal' },
   { to: '/chips', icon: CircuitBoard, label: '芯片', color: 'rose' },
   { to: '/drivers', icon: Layers, label: '外设库', color: 'orange' },
   { to: '/settings', icon: Settings, label: '设置', color: 'slate' },
@@ -22,6 +23,7 @@ const colorMap: Record<string, { active: string; dot: string }> = {
   indigo: { active: 'bg-indigo-500/15 text-indigo-400', dot: 'bg-indigo-400' },
   violet: { active: 'bg-violet-500/15 text-violet-400', dot: 'bg-violet-400' },
   fuchsia: { active: 'bg-fuchsia-500/15 text-fuchsia-400', dot: 'bg-fuchsia-400' },
+  teal: { active: 'bg-teal-500/15 text-teal-400', dot: 'bg-teal-400' },
   rose: { active: 'bg-rose-500/15 text-rose-400', dot: 'bg-rose-400' },
   orange: { active: 'bg-orange-500/15 text-orange-400', dot: 'bg-orange-400' },
   slate: { active: 'bg-slate-500/15 text-slate-400', dot: 'bg-slate-400' },

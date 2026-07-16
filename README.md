@@ -1,7 +1,7 @@
 # MetaCore AI — AI 智能硬件架构工程师平台
 
 > 一站式 AI 驱动的嵌入式硬件方案自动生成平台，支持 ESP32 / STM32 系列及自定义芯片。
-> 从需求描述到硬件方案、工程代码、执行流程图，全链路自动化。
+> 从需求描述到硬件方案、工程代码、执行流程图和本地工程诊断，全链路自动化。
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 项目简介
 
-MetaCore AI 是一个纯 Web 端的 AI 硬件架构工程师平台。你只需要用自然语言描述硬件需求（比如"做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测温湿度"），平台就会通过 AI 自动完成：
+MetaCore AI 是一个以 Web 前端为核心、可选配本地工程服务的 AI 硬件架构工程师平台。你只需要用自然语言描述硬件需求（比如"做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测温湿度"），平台就会通过 AI 自动完成：
 
 1. **硬件方案设计** — 引脚分配、BOM 清单、接线对照表
 2. **可视化引脚图** — SVG 芯片引脚图，悬停查看连接详情，支持暗色/亮色主题
@@ -35,8 +35,10 @@ MetaCore AI 是一个纯 Web 端的 AI 硬件架构工程师平台。你只需�
 6. **AI 问答助手** — 基于项目上下文的硬件工程顾问
 7. **自定义芯片** — 三种模式添加任意芯片（AI 识图 / AI 助填 / 手动配置）
 8. **一键导出** — ZIP 工程包 + 专业 PDF 文档
+9. **本地工程诊断** — 读取授权工作区，识别工程、芯片、物联网协议、依赖、引脚和安全风险
+10. **安全编辑与构建** — 自动备份文件，执行 PlatformIO / ESP-IDF / CMake 白名单构建
 
-无需安装任何桌面软件，浏览器打开即用。所有数据保存在本地浏览器中，不经过任何中间服务器。
+基础方案生成能力浏览器打开即用。启用本地工程模块时，需要同时运行项目内置的本地服务；服务只监听 `127.0.0.1`，并且只允许访问用户设置的工作区。
 
 ---
 
@@ -59,6 +61,10 @@ MetaCore AI 是一个纯 Web 端的 AI 硬件架构工程师平台。你只需�
 | 项目管理 | 多项目创建、加载、删除，数据本地持久化 |
 | 导出 | ZIP 工程包下载 + PDF 专业文档导出 |
 | 主题 | 暗色 / 亮色主题一键切换，全组件适配 |
+| 本地工程 | 目录浏览、文本搜索、Monaco 预览与安全编辑、自动备份与恢复 |
+| 智能诊断 | 工程类型、芯片、外设、IoT 协议、依赖、GPIO、代码质量与安全风险分析 |
+| 健康评分 | 工程结构、硬件资源、安全性、可维护性、联网能力五维评分 |
+| 构建验证 | 检测并执行 PlatformIO、ESP-IDF、CMake 白名单构建，展示日志与退出码 |
 
 ---
 
@@ -77,6 +83,7 @@ MetaCore AI 是一个纯 Web 端的 AI 硬件架构工程师平台。你只需�
 | pdfjs-dist | 浏览器端 PDF 文本提取（芯片 Datasheet 解析） |
 | JSZip | 浏览器端 ZIP 打包下载 |
 | Lucide React | 图标库 |
+| Node.js 本地服务 | 受控文件访问、静态分析、备份恢复、构建验证与报告生成 |
 
 ---
 
@@ -97,11 +104,27 @@ cd MetaCore-AI
 # 安装依赖
 npm install
 
-# 启动开发服务器
+# 启动基础 Web 前端
 npm run dev
 ```
 
-或者 Windows 用户直接双击 `start.bat` 一键启动（自动检测依赖、安装缺失包并打开浏览器）。
+启用本地工程诊断时，需要两个进程：
+
+```bash
+# 终端 1：本地工程服务
+npm run dev:server
+
+# 终端 2：Web 前端
+npm run dev
+```
+
+Windows 用户可以直接双击 `start-local.bat` 同时启动前后端；只使用基础 Web 功能时仍可双击 `start.bat`。
+
+运行本地工程自动化测试：
+
+```bash
+npm run test:local
+```
 
 26.3.27更改bat文件，添加安装node.js功能（如果未安装node.js，会自动安装最新版本，实验性功能）
 安装 Node.js 需要管理员权限，确保以管理员身份运行批处理文件
@@ -111,7 +134,9 @@ npm run dev
 npm run build
 ```
 
-将 `dist/` 目录部署到任意静态服务器即可。所有 AI 调用直接从浏览器发起，无需后端服务。
+将 `dist/` 目录部署到静态服务器后，可以继续使用方案生成、代码生成和导出功能。本地工程诊断、文件编辑、备份和构建能力要求用户电脑运行 `npm run dev:server`。
+
+毕业设计架构、创新点、测试方案和答辩演示流程见 [`docs/GRADUATION_DESIGN.md`](docs/GRADUATION_DESIGN.md)，本地接口见 [`docs/LOCAL_API.md`](docs/LOCAL_API.md)。
 
 ---
 
@@ -126,6 +151,7 @@ src/
 │   ├── codegen/         # 代码页子组件（FileTree、CodePreview、ExportButtons）
 │   ├── flow/            # 流程图子组件（FlowCanvas、AIChatPanel）
 │   ├── chips/           # 芯片管理组件（ChipManager、PdfParseMode、AssistedMode、FormMode）
+│   ├── local/           # 本地工程浏览、编辑、诊断、备份和构建界面
 │   ├── settings/        # 设置页子组件（AIServiceForm、ServiceCard）
 │   └── project/         # 项目管理组件（ProjectManager）
 ├── data/
@@ -138,8 +164,9 @@ src/
 │   ├── export/
 │   │   ├── zipExport.ts # ZIP 导出
 │   │   └── pdfExport.tsx# PDF 导出
-│   └── pdf/
-│       └── pdfExtractor.ts # PDF 文本提取（芯片 Datasheet 解析）
+│   ├── pdf/
+│   │   └── pdfExtractor.ts # PDF 文本提取（芯片 Datasheet 解析）
+│   └── local/           # 本地服务 API 客户端与类型
 ├── store/
 │   ├── projectStore.ts  # 项目状态管理
 │   ├── aiConfigStore.ts # AI 服务配置管理
@@ -152,6 +179,12 @@ src/
 ├── lib/
 │   └── utils.ts         # 工具函数
 └── App.tsx              # 路由配置
+server/
+├── index.mjs            # 本地工程服务、静态分析、安全保存和白名单构建
+└── smoke-test.mjs       # 本地服务自动化冒烟测试
+docs/
+├── GRADUATION_DESIGN.md # 毕业设计架构、创新点、测试和答辩演示
+└── LOCAL_API.md         # 本地服务接口文档
 ```
 
 ---
