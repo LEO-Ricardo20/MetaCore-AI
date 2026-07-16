@@ -136,7 +136,7 @@ npm run build
 
 将 `dist/` 目录部署到静态服务器后，可以继续使用方案生成、代码生成和导出功能。本地工程诊断、文件编辑、备份和构建能力要求用户电脑运行 `npm run dev:server`。
 
-毕业设计架构、创新点、测试方案和答辩演示流程见 [`docs/GRADUATION_DESIGN.md`](docs/GRADUATION_DESIGN.md)，本地接口见 [`docs/LOCAL_API.md`](docs/LOCAL_API.md)。
+本地服务接口和安全约束见 [`docs/LOCAL_API.md`](docs/LOCAL_API.md)。
 
 ---
 
@@ -183,7 +183,6 @@ server/
 ├── index.mjs            # 本地工程服务、静态分析、安全保存和白名单构建
 └── smoke-test.mjs       # 本地服务自动化冒烟测试
 docs/
-├── GRADUATION_DESIGN.md # 毕业设计架构、创新点、测试和答辩演示
 └── LOCAL_API.md         # 本地服务接口文档
 ```
 

@@ -973,14 +973,14 @@ function buildRecommendations(analysis, issues) {
   const recommendations = []
   if (!analysis.primaryProjectType) recommendations.push({ priority: 'high', title: '补全工程入口配置', detail: '增加 platformio.ini、CMakeLists.txt、.ino 或 .ioc 等明确的工程描述文件。' })
   if (!analysis.chips.length) recommendations.push({ priority: 'high', title: '明确目标芯片', detail: '在工程配置或 README 中记录具体芯片型号、主频、Flash 和引脚约束。' })
-  if (!analysis.protocols.length) recommendations.push({ priority: 'medium', title: '补充物联网通信层', detail: '根据课题选择 MQTT、HTTP、BLE、LoRaWAN 等协议，并设计断线重连与数据上报策略。' })
+  if (!analysis.protocols.length) recommendations.push({ priority: 'medium', title: '补充物联网通信层', detail: '根据应用场景选择 MQTT、HTTP、BLE、LoRaWAN 等协议，并设计断线重连与数据上报策略。' })
   if (analysis.statistics.codeLines > 200 && analysis.statistics.commentRatio < 0.08) {
     recommendations.push({ priority: 'medium', title: '完善代码可维护性', detail: '为初始化流程、传感器采集、通信状态机和异常恢复补充注释与模块说明。' })
   }
   if (issues.some((i) => i.category === 'security')) {
     recommendations.push({ priority: 'high', title: '移除硬编码凭据', detail: '将 Wi-Fi 密码、API Key 和 Token 移出源码，改用本地配置、环境变量或设备配网流程。' })
   }
-  if (analysis.pins.length) recommendations.push({ priority: 'low', title: '固化引脚资源表', detail: '将扫描到的 GPIO 与芯片限制表对照，形成论文中的硬件资源分配表。' })
+  if (analysis.pins.length) recommendations.push({ priority: 'low', title: '固化引脚资源表', detail: '将扫描到的 GPIO 与芯片限制表对照，形成可维护的硬件资源分配文档。' })
   if (!recommendations.length) recommendations.push({ priority: 'low', title: '保持工程基线', detail: '当前未发现明显结构问题，建议继续补充自动化构建和硬件在环测试记录。' })
   return recommendations.slice(0, 12)
 }
