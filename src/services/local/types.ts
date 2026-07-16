@@ -1,6 +1,7 @@
 export interface LocalHealth {
   ok: boolean
   service: string
+  version: string
   workspaceRoot: string
   port: number
 }

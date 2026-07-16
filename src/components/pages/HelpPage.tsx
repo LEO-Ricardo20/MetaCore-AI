@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { BookOpen, Zap, FileCode, GitBranch, Settings } from 'lucide-react'
+import { BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
+import { APP_RELEASE_DATE, APP_VERSION_LABEL } from '@/config/app'
 
 const SECTIONS = [
   {
@@ -44,6 +45,20 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'local',
+    icon: HardDrive,
+    color: 'emerald',
+    title: '本地工程',
+    steps: [
+      { title: '启动本地服务', desc: '运行 npm run dev:server，或在 Windows 双击 start-local.bat 同时启动前端与本地工程服务。' },
+      { title: '设置工作区', desc: '进入侧边栏「本地」，填写要分析的嵌入式工程目录。服务仅允许访问该目录及其子目录。' },
+      { title: '扫描与诊断', desc: '点击「扫描」识别工程类型、芯片、外设、IoT 协议、依赖、GPIO、代码统计和安全风险。' },
+      { title: '安全编辑', desc: '代码默认只读。进入编辑状态并确认保存后，系统会检查外部修改并在 .metacore-backups 中自动创建备份。' },
+      { title: '构建验证', desc: '构建页会检测 PlatformIO、ESP-IDF 和 CMake。系统只执行预定义的白名单构建命令，不接受任意命令参数。' },
+      { title: '隐私提示', desc: '避免选择包含私钥、生产凭据或无关个人数据的目录。只有主动点击 AI 深度判断时，诊断上下文才会发送给配置的 AI 服务商。' },
+    ],
+  },
+  {
     id: 'workflow',
     icon: GitBranch,
     color: 'fuchsia',
@@ -58,6 +73,20 @@ const SECTIONS = [
 ]
 
 const CHANGELOG = [
+  {
+    version: APP_VERSION_LABEL,
+    date: APP_RELEASE_DATE,
+    badge: 'emerald',
+    changes: [
+      '重大更新：新增可选本地工程服务，支持授权工作区目录浏览、文本搜索和 Monaco 文件预览',
+      '新增：本地工程静态分析，识别工程类型、芯片、外设、IoT 协议、依赖、GPIO 和安全风险',
+      '新增：工程健康评分与 Markdown 诊断报告，覆盖结构、硬件、安全、可维护性和联网能力',
+      '新增：用户确认后的文件编辑、修改冲突检测、自动备份与历史版本恢复',
+      '新增：PlatformIO、ESP-IDF、CMake 工具检测和白名单构建验证',
+      '新增：本地服务自动化冒烟测试、API 文档和 ESP32 智慧环境示例工程',
+      '优化：README、启动方式、安全边界和开源仓库结构全面整理',
+    ],
+  },
   {
     version: 'v1.5.6',
     date: '2026-03-25',
@@ -327,7 +356,8 @@ export default function HelpPage() {
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 硅基流动提供免费额度，适合日常测试使用</li>
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> ESP-IDF 格式生成的代码最完整，包含 CMakeLists</li>
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 引脚图悬停可查看详细连接信息</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 项目数据保存在本地浏览器，换设备需导出</li>
+                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 浏览器项目数据保存在 localStorage，换设备前应及时导出</li>
+                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 本地工程保存前自动备份，可在「质量」页签恢复历史版本</li>
                 <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 包含 SSD1306 OLED 或 DHT 温湿度的方案会自动注入驱动模板，生成代码可直接上板编译</li>
               </ul>
             </div>

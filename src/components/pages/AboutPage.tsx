@@ -1,16 +1,19 @@
-import { Zap, Cpu, Code2, GitBranch, Download, MessageSquare, Palette, FolderOpen, Shield, Heart, AlertTriangle } from 'lucide-react'
+import { Zap, Cpu, Code2, GitBranch, Download, MessageSquare, Palette, FolderOpen, Shield, Heart, AlertTriangle, HardDrive, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
+import { APP_VERSION_LABEL } from '@/config/app'
 
 const FEATURES = [
   { icon: Cpu, color: 'indigo', title: '硬件方案生成', desc: '自然语言描述需求，AI 自动生成引脚分配、BOM 清单、接线对照表' },
-  { icon: Code2, color: 'violet', title: '模块化代码生成', desc: '支持 ESP-IDF / Arduino / PlatformIO 三种工程格式，生成可编译代码' },
+  { icon: Code2, color: 'violet', title: '模块化代码生成', desc: '支持 ESP-IDF / Arduino / PlatformIO / STM32CubeIDE，生成结构化工程代码' },
   { icon: GitBranch, color: 'fuchsia', title: '流程图可视化', desc: '自动分析代码执行流程，生成可交互节点图，按类别彩色区分' },
   { icon: MessageSquare, color: 'cyan', title: 'AI 工程顾问', desc: '基于项目上下文的智能问答，硬件选型、调试建议一问即答' },
   { icon: Download, color: 'emerald', title: '一键导出', desc: 'ZIP 工程包 + PDF 专业文档，浏览器端生成无需服务器' },
   { icon: FolderOpen, color: 'amber', title: '项目管理', desc: '多项目创建、加载、删除，数据本地持久化自动保存' },
   { icon: Palette, color: 'rose', title: '主题切换', desc: '暗色 / 亮色主题一键切换，偏好自动记忆' },
-  { icon: Shield, color: 'teal', title: '隐私安全', desc: '所有数据保存在本地浏览器，AI 调用直连服务商，无中间服务器' },
+  { icon: HardDrive, color: 'teal', title: '本地工程诊断', desc: '在授权工作区内识别工程、芯片、协议、依赖、GPIO 和安全风险' },
+  { icon: Shield, color: 'slate', title: '安全操作', desc: '本地服务仅监听回环地址，文件保存自动备份，构建命令使用固定白名单' },
+  { icon: Terminal, color: 'emerald', title: '构建验证', desc: '检测 PlatformIO、ESP-IDF 和 CMake，并展示白名单构建日志与退出状态' },
 ]
 
 const CHIPS = [
@@ -31,6 +34,7 @@ const TECH_STACK = [
   { name: 'Monaco Editor', desc: '代码编辑器' },
   { name: '@react-pdf/renderer', desc: 'PDF 生成' },
   { name: 'JSZip', desc: 'ZIP 打包' },
+  { name: 'Node.js', desc: '本地工程服务' },
 ]
 
 const AI_PROVIDERS = [
@@ -58,14 +62,14 @@ export default function AboutPage() {
             MetaCore AI
           </h1>
           <p className={cn('text-sm max-w-lg mx-auto leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>
-            AI 驱动的嵌入式硬件架构工程师平台，从需求描述到硬件方案、工程代码、执行流程图，全链路自动化。
+            AI 辅助的嵌入式硬件架构与工程分析平台，从需求、方案、代码和流程图延伸到本地工程诊断与构建验证。
           </p>
           <div className={cn(
             'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono',
             isDark ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
           )}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            v1.5.6
+            {APP_VERSION_LABEL}
           </div>
         </div>
 
@@ -224,8 +228,8 @@ export default function AboutPage() {
               </p>
               <p>
                 <strong className={isDark ? 'text-slate-300' : 'text-slate-600'}>4. 数据隐私</strong><br />
-                本平台所有数据保存在用户本地浏览器中，不经过任何中间服务器。AI 调用直接发送至用户配置的 AI 服务商，
-                平台开发者不收集、存储或处理任何用户数据。用户应自行评估所选 AI 服务商的数据隐私政策。
+                项目状态、AI 配置和界面偏好默认保存在用户浏览器 localStorage 中。启用「本地」功能后，localhost 服务只在用户授权的工作区内读取、备份或修改文件。
+                AI 调用直接发送至用户配置的服务商；只有用户主动发起 AI 分析时，相关上下文才会提交至该服务商。请勿选择包含私钥、生产凭据或无关个人数据的目录。
               </p>
               <p>
                 <strong className={isDark ? 'text-slate-300' : 'text-slate-600'}>5. 知识产权</strong><br />

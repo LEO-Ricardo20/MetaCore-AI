@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom'
 import { Cpu, Code2, GitBranch, Settings, Zap, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon, Layers, HardDrive } from 'lucide-react'
 import { useThemeStore } from '@/store/themeStore'
 import { cn } from '@/lib/utils'
+import { APP_VERSION_LABEL } from '@/config/app'
 
 const nav = [
   { to: '/projects', icon: FolderOpen, label: '项目', color: 'cyan' },
@@ -96,7 +97,7 @@ export default function Sidebar() {
       </button>
 
       {/* 底部版本 */}
-      <div className={cn('mt-2 text-[9px] font-mono', isDark ? 'text-slate-700' : 'text-indigo-300')}>v1.5.6</div>
+      <div className={cn('mt-2 text-[9px] font-mono', isDark ? 'text-slate-700' : 'text-indigo-300')}>{APP_VERSION_LABEL}</div>
     </aside>
   )
 }

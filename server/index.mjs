@@ -17,6 +17,7 @@ const BUILD_TIMEOUT_MS = 120 * 1000
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CONFIG_PATH = process.env.METACORE_LOCAL_CONFIG || path.join(__dirname, '.metacore-local.json')
+const PACKAGE_META = JSON.parse(await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8'))
 
 let workspaceRoot = ''
 const operationLog = []
@@ -1130,7 +1131,7 @@ async function route(req, res) {
 
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    json(res, 200, { ok: true, service: 'metacore-local', workspaceRoot, port: PORT }, origin)
+    json(res, 200, { ok: true, service: 'metacore-local', version: PACKAGE_META.version, workspaceRoot, port: PORT }, origin)
     return
   }
 

@@ -1,366 +1,298 @@
-# MetaCore AI — AI 智能硬件架构工程师平台
+# MetaCore AI
 
-> 一站式 AI 驱动的嵌入式硬件方案自动生成平台，支持 ESP32 / STM32 系列及自定义芯片。
-> 从需求描述到硬件方案、工程代码、执行流程图和本地工程诊断，全链路自动化。
+> AI-assisted hardware architecture and embedded project analysis for ESP32, STM32, and custom chips.
 
----
+面向 ESP32、STM32 与自定义芯片的 AI 硬件方案生成、固件设计和本地嵌入式工程分析平台。
 
-## 目录
+Documentation language: English with Chinese UI names where they match the application.
 
-- [项目简介](#项目简介)
-- [功能概览](#功能概览)
-- [技术栈](#技术栈)
-- [快速开始](#快速开始)
-- [项目结构](#项目结构)
-- [页面与功能说明](#页面与功能说明)
-- [自定义芯片](#自定义芯片)
-- [AI 服务配置](#ai-服务配置)
-- [使用流程](#使用流程)
-- [导出功能](#导出功能)
-- [主题切换](#主题切换)
-- [免责声明](#免责声明)
-- [常见问题](#常见问题)
+[![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Node](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#release-status)
+[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#license)
 
----
+MetaCore AI turns a natural-language hardware requirement into a structured embedded design workflow:
 
-## 项目简介
+```text
+Requirement -> Hardware scheme -> Pin/BOM/Wiring -> Firmware -> Flow graph -> Local diagnosis -> Export
+```
 
-MetaCore AI 是一个以 Web 前端为核心、可选配本地工程服务的 AI 硬件架构工程师平台。你只需要用自然语言描述硬件需求（比如"做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测温湿度"），平台就会通过 AI 自动完成：
+The browser application handles the product interface and AI workflows. An optional localhost service adds controlled access to a user-selected embedded project directory for analysis, backups, editing, and build verification.
 
-1. **硬件方案设计** — 引脚分配、BOM 清单、接线对照表
-2. **可视化引脚图** — SVG 芯片引脚图，悬停查看连接详情，支持暗色/亮色主题
-3. **模块化工程代码** — 完整可编译的 C/C++ 工程（ESP-IDF / Arduino / PlatformIO）
-4. **AI 自检验证** — 代码生成后自动检查与硬件方案的一致性
-5. **代码执行流程图** — 自动分析代码生成可交互的流程图，节点支持自由拖动
-6. **AI 问答助手** — 基于项目上下文的硬件工程顾问
-7. **自定义芯片** — 三种模式添加任意芯片（AI 识图 / AI 助填 / 手动配置）
-8. **一键导出** — ZIP 工程包 + 专业 PDF 文档
-9. **本地工程诊断** — 读取授权工作区，识别工程、芯片、物联网协议、依赖、引脚和安全风险
-10. **安全编辑与构建** — 自动备份文件，执行 PlatformIO / ESP-IDF / CMake 白名单构建
+## Contents
 
-基础方案生成能力浏览器打开即用。启用本地工程模块时，需要同时运行项目内置的本地服务；服务只监听 `127.0.0.1`，并且只允许访问用户设置的工作区。
+- [Highlights](#highlights)
+- [Architecture](#architecture)
+- [Release Status](#release-status)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Local Engineering Mode](#local-engineering-mode)
+- [AI Providers](#ai-providers)
+- [Example Project](#example-project)
+- [Commands](#commands)
+- [Security Boundaries](#security-boundaries)
+- [Testing](#testing)
+- [Versioning](#versioning)
+- [Changelog](#changelog)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [License](#license)
 
----
+## Highlights
 
-## 功能概览
+| Area | What it provides |
+| --- | --- |
+| Hardware design | Chip selection, GPIO allocation, BOM, wiring table, and pin visualization |
+| Firmware generation | Modular C/C++ project generation for Arduino, PlatformIO, ESP-IDF, and STM32CubeIDE |
+| Driver library | Built-in templates for SSD1306, DHT, AHT20, WS2812, HC-SR04, buzzer, servo, and DRV8833 |
+| AI verification | Post-generation consistency checks against the selected hardware scheme |
+| Flow visualization | Interactive execution-flow graph with code context and AI assistant |
+| Custom chips | Datasheet parsing, AI-assisted form filling, and manual chip specification |
+| Local engineering mode | Directory browsing, text search, code preview, static analysis, health scoring, and reports |
+| Safe operations | User-confirmed file editing, modification-time conflict detection, automatic backups, and restore |
+| Build verification | Detect and run allowlisted PlatformIO, ESP-IDF, and CMake builds |
+| Export | ZIP firmware project packages and formatted PDF design documents |
 
-| 功能模块 | 说明 |
-|---------|------|
-| 需求生成 | 输入自然语言需求，AI 基于芯片完整技术规格生成精准硬件方案 |
-| 引脚可视化 | SVG 芯片图，支持预置芯片 + 自定义芯片，暗色/亮色主题适配 |
-| 代码生成 | 根据硬件方案生成模块化 C/C++ 工程代码，附带 AI 自检 |
-| 流程图 | 自动分析代码执行流程，生成可交互节点图，支持拖动布局 |
-| AI 问答 | 流程图页内置 AI 聊天面板，硬件工程顾问角色 |
-| 芯片管理 | 预置 5 种芯片（含 STM32F103-KIT）+ 支持三种方式添加自定义芯片 |
-| 驱动模板 | 内置 8 个验证驱动（SSD1306、DHT、AHT20、WS2812、HC-SR04、蜂鸣器、舵机、DRV8833），代码生成时自动匹配注入，可直接上板编译 |
-| 外设库浏览 | 侧边栏「外设库」页，按接口类型筛选，折叠展开查看驱动代码 |
-| 手动预选驱动 | 生成方案前可手动勾选外设驱动，与自动匹配结果合并注入 |
-| 一键式生成 | 可选开关，开启后点「生成方案」自动串行完成方案→代码→流程图三步 |
-| 工程格式 | 支持 ESP-IDF / Arduino / PlatformIO / STM32CubeIDE 四种格式 |
-| AI 协议 | OpenAI 服务商自动使用 Responses API，其他服务商保持 Chat Completions 兼容 |
-| 项目管理 | 多项目创建、加载、删除，数据本地持久化 |
-| 导出 | ZIP 工程包下载 + PDF 专业文档导出 |
-| 主题 | 暗色 / 亮色主题一键切换，全组件适配 |
-| 本地工程 | 目录浏览、文本搜索、Monaco 预览与安全编辑、自动备份与恢复 |
-| 智能诊断 | 工程类型、芯片、外设、IoT 协议、依赖、GPIO、代码质量与安全风险分析 |
-| 健康评分 | 工程结构、硬件资源、安全性、可维护性、联网能力五维评分 |
-| 构建验证 | 检测并执行 PlatformIO、ESP-IDF、CMake 白名单构建，展示日志与退出码 |
+## Architecture
 
----
+```mermaid
+flowchart LR
+    User[User] --> Web[React + TypeScript Web UI]
+    Web --> AI[Configured AI Provider]
+    Web --> Local[Optional localhost service]
+    Local --> Workspace[User-selected workspace]
+    Local --> Analyzer[Embedded project analyzer]
+    Local --> Backup[Backup and restore]
+    Local --> Build[Allowlisted build tools]
+    Analyzer --> Report[Structured diagnosis report]
+    Report --> Web
+```
 
-## 技术栈
+The local service is deliberately optional. Requirement generation, chip management, code generation, flow graphs, and export can run as a browser application. The local service is only needed for the `本地` workspace page.
 
-| 技术 | 用途 |
-|------|------|
-| React 18 + TypeScript | UI 框架 |
-| Vite 5 | 构建工具，开发热更新 |
-| Tailwind CSS 3 | 原子化 CSS 样式 |
-| Zustand | 轻量状态管理（含 persist 持久化） |
-| React Router 6 | 前端路由（HashRouter） |
-| ReactFlow | 流程图可视化 |
-| Monaco Editor | 代码预览编辑器（VS Code 同款） |
-| @react-pdf/renderer | 浏览器端 PDF 生成 |
-| pdfjs-dist | 浏览器端 PDF 文本提取（芯片 Datasheet 解析） |
-| JSZip | 浏览器端 ZIP 打包下载 |
-| Lucide React | 图标库 |
-| Node.js 本地服务 | 受控文件访问、静态分析、备份恢复、构建验证与报告生成 |
+## Release Status
 
----
+Current release: **v2.0.0** (`2026-07-16`)
 
-## 快速开始
+Version 2 introduces the optional localhost engineering service, local project diagnosis, five-dimensional health scoring, safe file editing with backups, report export, and allowlisted build verification. Earlier `v1.x` releases focused on browser-side hardware design and firmware generation.
 
-### 环境要求
+> [!IMPORTANT]
+> MetaCore AI generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
 
-- Node.js >= 18
-- npm >= 9（或 pnpm / yarn）
+> [!CAUTION]
+> The local workspace can expose source files to the application. AI providers only receive local engineering context when you explicitly start an AI analysis, but you should still avoid selecting folders containing private keys, production credentials, or unrelated personal data.
 
-### 安装与启动
+## Requirements
+
+- Windows, macOS, or Linux
+- Node.js 18 or newer
+- npm 9 or newer
+- A compatible AI provider, if you want AI generation or AI diagnosis
+- PlatformIO, ESP-IDF, or CMake only when you want local build verification
+
+## Quick Start
+
+### Browser application
 
 ```bash
-# 克隆项目
-git clone https://github.com/你的用户名/MetaCore-AI.git
+git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
 cd MetaCore-AI
-
-# 安装依赖
 npm install
-
-# 启动基础 Web 前端
 npm run dev
 ```
 
-启用本地工程诊断时，需要两个进程：
+Vite will print the local URL, normally `http://localhost:5173`.
+
+For Windows, `start.bat` starts the browser-only application. It does not need the local file service.
+
+## Local Engineering Mode
+
+### Frontend and local service
+
+The local mode runs as two processes:
 
 ```bash
-# 终端 1：本地工程服务
+# Terminal 1
 npm run dev:server
 
-# 终端 2：Web 前端
+# Terminal 2
 npm run dev
 ```
 
-Windows 用户可以直接双击 `start-local.bat` 同时启动前后端；只使用基础 Web 功能时仍可双击 `start.bat`。
+Windows users can double-click `start-local.bat` to start both processes. The service listens on `127.0.0.1:3766` and the web UI normally runs on `127.0.0.1:5173`.
 
-运行本地工程自动化测试：
+Open the `本地` page, set a workspace path, and click `扫描`. The analyzer can identify:
+
+- PlatformIO, ESP-IDF, Arduino, STM32CubeIDE, and CMake projects
+- ESP32, ESP32-S3, ESP32-C3, STM32F103, and STM32F4 references
+- GPIO definitions and common pin calls
+- DHT, OLED, WS2812, servo, motor, I2C, SPI, and UART clues
+- Wi-Fi, MQTT, HTTP, WebSocket, BLE, LoRa, Zigbee, Modbus, and CoAP clues
+- `#include` dependencies and PlatformIO `lib_deps`
+- Code size, language distribution, and comment ratio
+- Hard-coded credentials and plain-text network endpoints
+
+The current workspace is not exposed to the public network by the service. File edits require confirmation and create a backup before writing.
+
+API details are documented in [`docs/LOCAL_API.md`](docs/LOCAL_API.md).
+
+## AI Providers
+
+Configure providers from the `设置` page. The current client supports:
+
+- DeepSeek
+- SiliconFlow
+- Qwen
+- OpenAI Responses API
+- Ollama-compatible local models
+- Custom OpenAI-compatible endpoints
+
+AI keys are stored in the browser's `localStorage` by the current implementation. Direct AI requests are sent from the browser to the configured provider. Do not use a shared browser profile for production credentials, and review the provider's privacy policy before sending source code or datasheets for analysis.
+
+## Typical Workflow
+
+1. Open `设置` and configure an AI provider.
+2. Open `方案`, describe the hardware requirement, and select a target chip and project format.
+3. Generate the hardware scheme and review the pin diagram, BOM, and wiring table.
+4. Generate firmware code and run the built-in AI consistency check.
+5. Open `流程` to inspect the generated execution flow.
+6. Export a ZIP project or PDF design document.
+7. Optionally open `本地`, select an existing embedded project, scan it, and review the diagnosis report.
+
+## Example Project
+
+The repository includes a small PlatformIO example for local analysis:
+
+[`examples/esp32-smart-environment`](examples/esp32-smart-environment/)
+
+It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, dependency detection, and PlatformIO build detection. Replace the example network settings before using it with real hardware.
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite frontend |
+| `npm run dev:server` | Start the localhost engineering service |
+| `npm run build` | Type-check and create a production frontend build |
+| `npm run preview` | Preview the production build with Vite |
+| `npm run test:local` | Run the local service smoke test |
+
+## Project Structure
+
+```text
+src/
+├── components/          # React UI, pages, editors, diagrams, and local workspace panels
+├── data/                # Chip specifications, code templates, and driver templates
+├── services/            # AI, PDF, export, and local-service clients
+├── store/               # Zustand application stores
+├── types/               # Domain types for hardware, projects, and AI services
+└── App.tsx              # HashRouter routes
+server/
+├── index.mjs            # Local filesystem service, analyzer, backups, and builds
+└── smoke-test.mjs       # Self-contained local API smoke test
+docs/
+└── LOCAL_API.md         # Local service API reference
+examples/
+└── esp32-smart-environment/  # PlatformIO analysis example
+public/
+└── fonts/              # Fonts used by PDF export
+```
+
+## Security Boundaries
+
+The local service is designed for a local development workflow, not as a general remote file server:
+
+- It binds to `127.0.0.1` only.
+- It rejects non-local browser origins.
+- Every path is normalized and checked against the selected workspace.
+- Scans skip `.git`, `node_modules`, build outputs, and backup directories.
+- Text reads and request bodies have size limits.
+- File saves compare the original modification time to avoid overwriting external edits.
+- Builds use fixed server-side profiles instead of arbitrary commands or arguments.
+- The AI provider does not receive local files unless the user explicitly starts an AI analysis.
+
+### Operational notes
+
+- Backups are written to `.metacore-backups` inside the selected workspace.
+- Build verification can create normal tool output such as `.pio`, `build`, or generated artifacts.
+- Clearing browser storage removes saved projects and AI configuration from the browser.
+- Static hosting only provides browser features; the local workspace page still requires `npm run dev:server` on the user's machine.
+- API keys must not be committed to this repository or placed in the example project.
+
+## Testing
+
+Run the local service smoke test:
 
 ```bash
 npm run test:local
 ```
 
-26.3.27更改bat文件，添加安装node.js功能（如果未安装node.js，会自动安装最新版本，实验性功能）
-安装 Node.js 需要管理员权限，确保以管理员身份运行批处理文件
-### 构建部署
+The test creates a temporary PlatformIO-like project and verifies workspace setup, directory listing, ESP32 and IoT protocol detection, dependency extraction, file writing with backup, report generation, and build profile detection.
+
+Run the production build before submitting changes:
 
 ```bash
 npm run build
 ```
 
-将 `dist/` 目录部署到静态服务器后，可以继续使用方案生成、代码生成和导出功能。本地工程诊断、文件编辑、备份和构建能力要求用户电脑运行 `npm run dev:server`。
+## Versioning
 
-本地服务接口和安全约束见 [`docs/LOCAL_API.md`](docs/LOCAL_API.md)。
+MetaCore AI follows [Semantic Versioning](https://semver.org/):
 
----
+- **Major** (`2.0.0`): incompatible architecture or workflow changes
+- **Minor** (`2.1.0`): backward-compatible features
+- **Patch** (`2.0.1`): backward-compatible fixes and documentation corrections
 
-## 项目结构
+The canonical application version is stored in `package.json`. The frontend and localhost service read this value at runtime. Release-facing scripts and the changelog should be updated in the same release commit.
 
-```
-src/
-├── components/
-│   ├── layout/          # 布局组件（Sidebar、MainLayout）
-│   ├── pages/           # 页面组件（Requirement、Codegen、Flow、Settings、Help、About）
-│   ├── requirement/     # 需求页子组件（PinDiagram、PinTable、BOMTable、WiringTable）
-│   ├── codegen/         # 代码页子组件（FileTree、CodePreview、ExportButtons）
-│   ├── flow/            # 流程图子组件（FlowCanvas、AIChatPanel）
-│   ├── chips/           # 芯片管理组件（ChipManager、PdfParseMode、AssistedMode、FormMode）
-│   ├── local/           # 本地工程浏览、编辑、诊断、备份和构建界面
-│   ├── settings/        # 设置页子组件（AIServiceForm、ServiceCard）
-│   └── project/         # 项目管理组件（ProjectManager）
-├── data/
-│   ├── chipSpecs.ts     # 芯片知识库（4 种预置芯片完整技术规格）
-│   └── codeTemplates.ts # 代码模板库（3 种框架骨架 + 最佳实践）
-├── services/
-│   ├── ai/
-│   │   ├── client.ts    # AI 调用客户端（支持多服务商 + temperature 控制）
-│   │   └── prompts.ts   # AI Prompt 模板（system+user 双消息 + 芯片规格注入）
-│   ├── export/
-│   │   ├── zipExport.ts # ZIP 导出
-│   │   └── pdfExport.tsx# PDF 导出
-│   ├── pdf/
-│   │   └── pdfExtractor.ts # PDF 文本提取（芯片 Datasheet 解析）
-│   └── local/           # 本地服务 API 客户端与类型
-├── store/
-│   ├── projectStore.ts  # 项目状态管理
-│   ├── aiConfigStore.ts # AI 服务配置管理
-│   ├── chipStore.ts     # 自定义芯片管理
-│   └── themeStore.ts    # 主题状态管理
-├── types/
-│   ├── hardware.ts      # 硬件相关类型（ChipSpec、GpioPin、PeripheralBus 等）
-│   ├── project.ts       # 项目相关类型
-│   └── ai.ts            # AI 服务相关类型
-├── lib/
-│   └── utils.ts         # 工具函数
-└── App.tsx              # 路由配置
-server/
-├── index.mjs            # 本地工程服务、静态分析、安全保存和白名单构建
-└── smoke-test.mjs       # 本地服务自动化冒烟测试
-docs/
-└── LOCAL_API.md         # 本地服务接口文档
+## Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md) for release history and migration notes.
+
+## Troubleshooting
+
+### AI generation fails
+
+- Confirm an active provider and API key on `设置`.
+- Check the provider endpoint and model name.
+- For Ollama, start `ollama serve` and confirm the model is installed.
+- Check browser developer tools for CORS or provider-side errors.
+
+### The local page says the service is offline
+
+Start the service in the project directory:
+
+```bash
+npm run dev:server
 ```
 
----
+Then click `刷新连接` in the local workspace page.
 
-## 页面与功能说明
+### A build profile is disabled
 
-### 方案页（/requirement）
+The project marker may exist, but the corresponding tool is not available in `PATH`. Install PlatformIO, ESP-IDF, or CMake and restart the local service.
 
-输入自然语言需求，选择目标芯片和工程格式，AI 自动生成：
-- 硬件方案概述
-- 引脚分配表 / SVG 引脚图（可切换视图）
-- BOM 物料清单（含预估参考价）
-- 接线对照表
+## Limitations
 
-方案生成后会显示精准度提示：生成结果的准确性与所选 AI 模型性能及芯片参数完整度直接相关。
+- Static analysis is rule-based and cannot fully understand complex macros, generated code, or every conditional compilation path.
+- Pin validation depends on the detected chip and the available local knowledge base.
+- Arduino CLI compilation requires an explicit board FQBN and is not enabled as an automatic build profile yet.
+- Generated hardware designs and firmware must be reviewed against the actual datasheet and hardware.
+- This project does not replace electrical safety review, security review, or hardware-in-the-loop testing.
 
-### 代码页（/codegen）
+## Contributing
 
-基于硬件方案生成模块化工程代码：
-- 文件树浏览 + Monaco 代码预览
-- 生成后自动进行 AI 自检，检查代码与方案的一致性
-- 支持导出 ZIP / PDF
+1. Create a feature branch.
+2. Keep UI changes consistent with the existing React, TypeScript, Tailwind, and Zustand patterns.
+3. Keep local filesystem operations inside the workspace security boundary.
+4. Add or update the local smoke test when changing server behavior.
+5. Run `npm run test:local` and `npm run build` before opening a pull request.
 
-### 流程图页（/flow）
+## License
 
-自动分析代码执行流程：
-- 可交互节点图，点击查看关联代码
-- 节点支持自由拖动调整布局
-- 内置 AI 问答面板，基于项目上下文回答问题
-
-### 芯片管理页（/chips）
-
-管理预置和自定义芯片，详见下方「自定义芯片」章节。
-
-### 设置页（/settings）
-
-配置 AI 服务商，支持：DeepSeek、硅基流动、通义千问、OpenAI、Ollama（本地）。
-
-### 帮助页（/help）
-
-快速开始教程 + 更新日志。
-
-### 关于页（/about）
-
-平台介绍、技术栈、版权信息、免责声明。
-
----
-
-## 自定义芯片
-
-除了预置的 4 种芯片（ESP32、ESP32-S3、STM32F103、STM32F4），你可以通过三种方式添加任意芯片：
-
-| 模式 | 说明 | 适用场景 |
-|------|------|---------|
-| AI 识图 | 上传芯片 PDF Datasheet，AI 自动提取技术参数 | 有 Datasheet，想快速录入 |
-| AI 助填 | 上传 PDF 预填表单 + 手动微调 | 想在 AI 基础上精确调整 |
-| 自由配置 | 4 步分步表单手动填写所有参数 | 无 PDF 或需要完全自定义 |
-
-自定义芯片录入的参数包括：
-- 基本信息（名称、架构、Flash、SRAM、主频、电压）
-- GPIO 引脚列表（引脚号、复用功能、是否仅输入）
-- 外设总线（I2C/SPI/UART/I2S 等默认引脚）
-- 启动受限引脚、关键限制条件
-
-自定义芯片的技术规格会自动注入 AI 方案生成流程，确保生成结果的精准度。
-
----
-
-## AI 服务配置
-
-在「设置」页面添加 AI 服务：
-
-| 服务商 | 说明 |
-|--------|------|
-| DeepSeek | 国产大模型，性价比高，推荐 deepseek-chat |
-| 硅基流动 | 聚合平台，支持多种模型 |
-| 通义千问 | 阿里云大模型 |
-| OpenAI | GPT 系列，需海外网络 |
-| Ollama | 本地部署，无需 API Key，需先启动 `ollama serve` |
-
-配置步骤：
-1. 选择服务商，填入 API Key
-2. 点击「测试连接」验证
-3. 设为活跃服务
-
-> API Key 仅保存在你的浏览器 localStorage 中，不会上传到任何服务器。AI 调用直接从浏览器发送至对应服务商。
-
----
-
-## 使用流程
-
-```
-描述需求 → 选择芯片/格式 → 生成方案 → 生成代码 → 查看流程图 → 导出
-```
-
-1. 在「设置」页配置 AI 服务
-2. 在「方案」页输入需求，选择芯片和工程格式
-3. 点击「生成方案」，查看引脚图、BOM、接线表
-4. 点击「生成工程代码」，AI 自动生成 + 自检
-5. 在「流程图」页查看代码执行逻辑
-6. 导出 ZIP 工程包或 PDF 文档
-
----
-
-## 导出功能
-
-### ZIP 导出
-- 包含完整工程目录结构
-- 可直接导入 VS Code + ESP-IDF / Arduino IDE / PlatformIO
-
-### PDF 导出
-- 包含硬件方案、引脚分配、BOM 清单、接线表、代码清单
-- 专业排版，适合打印和存档
-- 内置中文字体（SimHei），完美支持中文内容导出
-
----
-
-## 主题切换
-
-点击侧边栏底部的太阳/月亮图标切换暗色/亮色主题。所有组件（包括引脚图、流程图、代码编辑器）均已适配双主题。
-
----
-
-## 免责声明
-
-1. **AI 生成内容** — 所有硬件方案、代码、流程图均由 AI 自动生成，仅供学习和参考。生成结果的准确性与所选 AI 模型性能及芯片参数完整度直接相关。用户在实际应用前应自行验证准确性和安全性。
-
-2. **价格信息** — BOM 清单中的价格均为 AI 预估参考价，不构成任何报价承诺，请以实际询价为准。
-
-3. **安全与合规** — 生成内容未经安全认证或合规审查。用于商业产品、医疗设备、车载系统等安全关键领域前，必须进行专业评审。因使用本平台生成内容导致的任何损失，开发者不承担法律责任。
-
-4. **数据隐私** — 所有数据保存在用户本地浏览器中，平台不收集、存储或处理任何用户数据。AI 调用直接发送至用户配置的服务商，用户应自行评估其数据隐私政策。
-
-5. **知识产权** — AI 生成的代码和方案归用户所有，但可能无意中包含与第三方知识产权相似的部分，用户在商业使用前应自行审查。
-
----
-
-## 常见问题
-
-### Q: 生成失败怎么办？
-- 检查「设置」页的 AI 服务是否已配置 API Key 并设为活跃
-- 检查网络连接是否正常
-- 如果使用 Ollama，确保本地服务已启动（`ollama serve`）
-- 尝试切换其他 AI 服务商
-
-### Q: 生成的方案不够精准？
-- 使用高性能 AI 模型（如 DeepSeek V3、GPT-4）效果更好
-- 在「芯片管理」中补充完善芯片技术规格，参数越完整精准度越高
-- 尝试更详细地描述需求，包括具体的传感器型号、通信方式等
-
-### Q: 生成的代码能直接编译吗？
-- AI 生成的代码以完整可编译为目标，但可能需要根据实际硬件微调
-- 代码生成后会自动进行 AI 自检，如有问题会在顶栏提示
-- 建议下载 ZIP 后在对应 IDE 中打开检查
-
-### Q: 数据保存在哪里？
-- 所有数据（项目、AI 配置、自定义芯片、主题偏好）保存在浏览器 localStorage 中
-- 清除浏览器数据会丢失所有项目，建议重要项目及时导出
-
-### Q: 支持哪些芯片？
-- 预置：ESP32（38 Pin）、ESP32-S3（38 Pin）、STM32F103（48 Pin）、STM32F4（100 Pin）
-- 自定义：支持通过 AI 识图、AI 助填或手动配置添加任意芯片
-
-### Q: 可以部署到服务器吗？
-- 可以。运行 `npm run build` 后将 `dist/` 目录部署到任意静态服务器即可
-- 所有 AI 调用直接从浏览器发起，无需后端服务
-
----
-
-## 版本
-
-当前版本：**v1.5.6**
-
----
-
-## 许可
-
-本项目由开发者 Leo 独立设计与开发。所有代码、设计、文档及相关知识产权均归 Leo 所有。
+The repository currently uses an **All Rights Reserved** notice. The source is published on GitHub for reference and collaboration, but it is not granted an OSI-approved open-source license at this time. Do not redistribute, relicense, or use the code commercially without permission from the copyright holder.
 
 © 2026 Leo. All rights reserved.
