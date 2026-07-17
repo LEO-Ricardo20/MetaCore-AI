@@ -1,311 +1,334 @@
 # MetaCore AI
 
-> AI-assisted hardware architecture and embedded project analysis for ESP32, STM32, and custom chips.
+[简体中文](./README.md) | [English](./README_EN.md)
 
-面向 ESP32、STM32 与自定义芯片的 AI 硬件方案生成、固件设计和本地嵌入式工程分析平台。
-
-Documentation language: English with Chinese UI names where they match the application.
+> 面向 ESP32、STM32 与自定义芯片的 AI 硬件架构、固件生成和本地嵌入式工程分析平台。
 
 [![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#release-status)
-[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#license)
+[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#版本状态)
+[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#许可证)
 
-MetaCore AI turns a natural-language hardware requirement into a structured embedded design workflow:
+MetaCore AI 将自然语言硬件需求转化为结构化的嵌入式开发流程：
 
 ```text
-Requirement -> Hardware scheme -> Pin/BOM/Wiring -> Firmware -> Flow graph -> Local diagnosis -> Export
+需求描述 -> 硬件方案 -> 引脚/BOM/接线 -> 固件代码 -> 流程图 -> 本地诊断 -> 导出
 ```
 
-The browser application handles the product interface and AI workflows. An optional localhost service adds controlled access to a user-selected embedded project directory for analysis, backups, editing, and build verification.
+浏览器应用负责产品界面和 AI 工作流；localhost 服务负责 AI 代理、本地工作区分析、安全文件操作、备份和构建验证。
 
-## Contents
+## 目录
 
-- [Highlights](#highlights)
-- [Architecture](#architecture)
-- [Release Status](#release-status)
-- [Requirements](#requirements)
-- [Quick Start](#quick-start)
-- [Local Engineering Mode](#local-engineering-mode)
-- [AI Providers](#ai-providers)
-- [Sponsor](#sponsor)
-- [Example Project](#example-project)
-- [Commands](#commands)
-- [Security Boundaries](#security-boundaries)
-- [Testing](#testing)
-- [Versioning](#versioning)
-- [Changelog](#changelog)
-- [Troubleshooting](#troubleshooting)
-- [Limitations](#limitations)
-- [Contributing](#contributing)
-- [License](#license)
+- [功能亮点](#功能亮点)
+- [系统架构](#系统架构)
+- [版本状态](#版本状态)
+- [赞助支持](#赞助支持)
+- [环境要求](#环境要求)
+- [快速开始](#快速开始)
+- [本地工程模式](#本地工程模式)
+- [AI 服务](#ai-服务)
+- [典型使用流程](#典型使用流程)
+- [示例工程](#示例工程)
+- [常用命令](#常用命令)
+- [项目结构](#项目结构)
+- [安全边界](#安全边界)
+- [测试](#测试)
+- [版本规范](#版本规范)
+- [更新日志](#更新日志)
+- [故障排查](#故障排查)
+- [已知限制](#已知限制)
+- [参与贡献](#参与贡献)
+- [许可证](#许可证)
 
-## Highlights
+## 功能亮点
 
-| Area | What it provides |
+| 模块 | 能力 |
 | --- | --- |
-| Hardware design | Chip selection, GPIO allocation, BOM, wiring table, and pin visualization |
-| Firmware generation | Modular C/C++ project generation for Arduino, PlatformIO, ESP-IDF, and STM32CubeIDE |
-| Driver library | Built-in templates for SSD1306, DHT, AHT20, WS2812, HC-SR04, buzzer, servo, and DRV8833 |
-| AI verification | Post-generation consistency checks against the selected hardware scheme |
-| Flow visualization | Interactive execution-flow graph with code context and AI assistant |
-| Custom chips | Datasheet parsing, AI-assisted form filling, and manual chip specification |
-| Local engineering mode | Directory browsing, text search, code preview, static analysis, health scoring, and reports |
-| Safe operations | User-confirmed file editing, modification-time conflict detection, automatic backups, and restore |
-| Build verification | Detect and run allowlisted PlatformIO, ESP-IDF, and CMake builds |
-| Export | ZIP firmware project packages and formatted PDF design documents |
+| 硬件方案 | 芯片选择、GPIO 分配、BOM、接线表和引脚可视化 |
+| 固件生成 | 为 Arduino、PlatformIO、ESP-IDF 和 STM32CubeIDE 生成模块化 C/C++ 工程 |
+| 外设驱动库 | 内置 SSD1306、DHT、AHT20、WS2812、HC-SR04、蜂鸣器、舵机和 DRV8833 模板 |
+| AI 一致性检查 | 生成代码后自动检查代码与硬件方案是否一致 |
+| 流程图可视化 | 根据工程代码生成可交互执行流程图，并提供 AI 工程问答 |
+| 自定义芯片 | 支持数据手册解析、AI 辅助填写和手动芯片参数配置 |
+| 本地工程诊断 | 目录浏览、全文搜索、代码预览、静态分析、健康评分和诊断报告 |
+| 安全文件操作 | 用户确认后写入、修改时间冲突检测、自动备份和恢复 |
+| 构建验证 | 检测并运行白名单内的 PlatformIO、ESP-IDF 和 CMake 构建 |
+| 项目导出 | 导出 ZIP 固件工程和格式化 PDF 设计文档 |
 
-## Architecture
+## 系统架构
 
 ```mermaid
 flowchart LR
-    User[User] --> Web[React + TypeScript Web UI]
-    Web --> AI[Configured AI Provider]
-    Web --> Local[Optional localhost service]
-    Local --> Workspace[User-selected workspace]
-    Local --> Analyzer[Embedded project analyzer]
-    Local --> Backup[Backup and restore]
-    Local --> Build[Allowlisted build tools]
-    Analyzer --> Report[Structured diagnosis report]
+    User[用户] --> Web[React + TypeScript Web UI]
+    Web --> Local[localhost 本地服务]
+    Local --> AI[用户配置的 AI 服务商]
+    Web -. 服务商允许 CORS 时回退 .-> AI
+    Local --> Workspace[用户授权的工作区]
+    Local --> Analyzer[嵌入式工程分析器]
+    Local --> Backup[备份与恢复]
+    Local --> Build[白名单构建工具]
+    Analyzer --> Report[结构化诊断报告]
     Report --> Web
 ```
 
-The local service is deliberately optional. Requirement generation, chip management, code generation, flow graphs, and export can run as a browser application. The local service is only needed for the `本地` workspace page.
+完整模式建议同时运行前端和 localhost 服务。AI 请求优先通过本地代理发送，从而减少浏览器 CORS 问题；只有服务商允许浏览器跨域访问时，客户端才可能回退到浏览器直连。
 
-## Release Status
+## 版本状态
 
-Current release: **v2.0.0** (`2026-07-16`)
+当前版本：**v2.0.0**，发布日期为 `2026-07-16`。
 
-Version 2 introduces the optional localhost engineering service, local project diagnosis, five-dimensional health scoring, safe file editing with backups, report export, and allowlisted build verification. Earlier `v1.x` releases focused on browser-side hardware design and firmware generation.
+2.0 版本新增 localhost 工程服务、本地项目诊断、五维健康评分、安全文件编辑与备份、报告导出、白名单构建验证和 AI 请求代理。早期 `v1.x` 版本主要聚焦浏览器端硬件设计和固件生成。
 
 > [!IMPORTANT]
-> MetaCore AI generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
+> MetaCore AI 生成的是工程建议和参考代码，不是经过认证的量产硬件。请始终根据真实芯片手册和目标开发板复核引脚、电气限制、依赖和固件行为。
 
 > [!CAUTION]
-> The local workspace can expose source files to the application. AI providers only receive local engineering context when you explicitly start an AI analysis, but you should still avoid selecting folders containing private keys, production credentials, or unrelated personal data.
+> 本地工作区可能包含源代码。只有用户主动发起 AI 分析时，相关上下文才会提交到所选服务商。不要选择包含私钥、生产凭据或无关个人数据的目录。
 
-## Requirements
+## 赞助支持
 
-- Windows, macOS, or Linux
-- Node.js 18 or newer
-- npm 9 or newer
-- A compatible AI provider, if you want AI generation or AI diagnosis
-- PlatformIO, ESP-IDF, or CMake only when you want local build verification
-
-## Quick Start
-
-### Browser application
-
-```bash
-git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
-cd MetaCore-AI
-npm install
-npm run dev
-```
-
-Vite will print the local URL, normally `http://localhost:5173`.
-
-For Windows, `start.bat` starts the browser-only application. It does not need the local file service.
-
-## Local Engineering Mode
-
-### Frontend and local service
-
-The local mode runs as two processes:
-
-```bash
-# Terminal 1
-npm run dev:server
-
-# Terminal 2
-npm run dev
-```
-
-Windows users can double-click `start-local.bat` to start both processes. The service listens on `127.0.0.1:3766` and the web UI normally runs on `127.0.0.1:5173`.
-
-Open the `本地` page, set a workspace path, and click `扫描`. The analyzer can identify:
-
-- PlatformIO, ESP-IDF, Arduino, STM32CubeIDE, and CMake projects
-- ESP32, ESP32-S3, ESP32-C3, STM32F103, and STM32F4 references
-- GPIO definitions and common pin calls
-- DHT, OLED, WS2812, servo, motor, I2C, SPI, and UART clues
-- Wi-Fi, MQTT, HTTP, WebSocket, BLE, LoRa, Zigbee, Modbus, and CoAP clues
-- `#include` dependencies and PlatformIO `lib_deps`
-- Code size, language distribution, and comment ratio
-- Hard-coded credentials and plain-text network endpoints
-
-The current workspace is not exposed to the public network by the service. File edits require confirmation and create a backup before writing.
-
-API details are documented in [`docs/LOCAL_API.md`](docs/LOCAL_API.md).
-
-## AI Providers
-
-Configure providers from the `设置` page. The current client supports:
-
-- DeepSeek
-- SiliconFlow
-- Qwen
-- OpenAI Responses API
-- Ollama-compatible local models
-- Custom OpenAI-compatible endpoints
-
-AI keys are stored in the browser's `localStorage` by the current implementation. Browser storage is outside the Git working tree and is not included by `git add`, commit, or push. When the localhost service is running, AI requests use the local proxy; the service forwards the key only to the configured provider and does not persist it or write it to operation logs. If the proxy is unavailable, the client may fall back to a browser-direct request when the provider permits CORS.
-
-Do not use a shared browser profile for production credentials. Clear the site's browser data before handing the computer to another user, never place real keys in source files, screenshots, issues, or exported configuration, and review the provider's privacy policy before sending source code or datasheets for analysis.
-
-## Sponsor
-
-Thanks to VPS.Town for supporting the MetaCore AI project.
+感谢 VPS.Town 对 MetaCore AI 项目开发的支持。
 
 <a href="https://vps.town/" target="_blank" rel="noreferrer">
   <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />
 </a>
 
-- [VPS.Town official website](https://vps.town/)
+- [访问 VPS.Town 官网](https://vps.town/)
 
-## Typical Workflow
+## 环境要求
 
-1. Open `设置` and configure an AI provider.
-2. Open `方案`, describe the hardware requirement, and select a target chip and project format.
-3. Generate the hardware scheme and review the pin diagram, BOM, and wiring table.
-4. Generate firmware code and run the built-in AI consistency check.
-5. Open `流程` to inspect the generated execution flow.
-6. Export a ZIP project or PDF design document.
-7. Optionally open `本地`, select an existing embedded project, scan it, and review the diagnosis report.
+- Windows、macOS 或 Linux
+- Node.js 18 或更高版本
+- npm 9 或更高版本
+- 使用 AI 生成或 AI 诊断时，需要一个兼容的 AI 服务
+- 只有进行本地构建验证时，才需要 PlatformIO、ESP-IDF 或 CMake
 
-## Example Project
+## 快速开始
 
-The repository includes a small PlatformIO example for local analysis:
+### 完整模式
+
+```bash
+git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
+cd MetaCore-AI
+npm install
+```
+
+分别启动本地服务和前端：
+
+```bash
+# 终端 1
+npm run dev:server
+
+# 终端 2
+npm run dev
+```
+
+Vite 通常会输出 `http://127.0.0.1:5173` 或 `http://localhost:5173`。
+
+Windows 用户可以直接双击：
+
+```text
+start-local.bat
+```
+
+### 仅浏览器模式
+
+```bash
+npm run dev
+```
+
+仅浏览器模式可以使用基础界面和不依赖本地文件的功能，但 AI 服务可能受到浏览器 CORS 限制，`本地`工作区页面也无法使用。
+
+## 本地工程模式
+
+本地服务监听 `127.0.0.1:3766`，Web UI 通常监听 `127.0.0.1:5173`。
+
+打开`本地`页面，设置工作区路径并点击`扫描`。分析器可以识别：
+
+- PlatformIO、ESP-IDF、Arduino、STM32CubeIDE 和 CMake 工程
+- ESP32、ESP32-S3、ESP32-C3、STM32F103 和 STM32F4 相关代码
+- GPIO 定义和常见引脚调用
+- DHT、OLED、WS2812、舵机、电机、I2C、SPI 和 UART 线索
+- Wi-Fi、MQTT、HTTP、WebSocket、BLE、LoRa、Zigbee、Modbus 和 CoAP 线索
+- `#include` 依赖和 PlatformIO `lib_deps`
+- 代码规模、语言分布和注释比例
+- 硬编码凭据和明文网络端点
+
+服务不会把当前工作区暴露到公网。文件写入需要用户确认，并会在修改前创建备份。
+
+本地 API 说明见 [`docs/LOCAL_API.md`](docs/LOCAL_API.md)。
+
+## AI 服务
+
+在`设置`页面配置 AI 服务。当前支持：
+
+- DeepSeek
+- 硅基流动
+- 通义千问
+- OpenAI Responses API
+- Ollama 本地模型
+- 自定义 OpenAI 兼容服务
+
+自定义服务可以选择：
+
+- Responses API
+- Chat Completions API
+
+`autobits.cc` 类型的 CCH 服务会自动使用 Responses API。其他中转平台应以其官方文档和 `/models` 返回结果为准。
+
+当前实现将 API Key 保存到浏览器 `localStorage`。浏览器存储不属于 Git 工作区，不会被 `git add`、commit 或 push 上传。localhost 服务只把 Key 转发给用户配置的目标服务商，不会持久化 Key，也不会把 Key 写入操作日志。
+
+不要在共享浏览器配置中保存正式凭据。交接电脑前应清除网站数据，不要把真实 Key 放进源码、截图、Issue、日志或导出配置。
+
+## 典型使用流程
+
+1. 打开`设置`，配置并测试 AI 服务。
+2. 打开`方案`，输入硬件需求，选择目标芯片和工程格式。
+3. 生成硬件方案，检查引脚图、BOM 和接线表。
+4. 生成固件代码，并运行 AI 一致性检查。
+5. 打开`流程`，查看生成的执行流程图。
+6. 导出 ZIP 工程或 PDF 设计文档。
+7. 可选：打开`本地`页面，选择已有嵌入式工程并生成诊断报告。
+
+## 示例工程
+
+仓库内包含一个用于本地分析的 PlatformIO 示例：
 
 [`examples/esp32-smart-environment`](examples/esp32-smart-environment/)
 
-It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, dependency detection, and PlatformIO build detection. Replace the example network settings before using it with real hardware.
+示例包含 ESP32、Wi-Fi、MQTT、DHT22、SSD1306、I2C、GPIO、依赖识别和 PlatformIO 构建检测。连接真实硬件前，请替换示例网络配置。
 
-## Commands
+## 常用命令
 
-| Command | Purpose |
+| 命令 | 用途 |
 | --- | --- |
-| `npm run dev` | Start the Vite frontend |
-| `npm run dev:server` | Start the localhost engineering service |
-| `npm run build` | Type-check and create a production frontend build |
-| `npm run preview` | Preview the production build with Vite |
-| `npm run test:local` | Run the local service smoke test |
+| `npm run dev` | 启动 Vite 前端 |
+| `npm run dev:server` | 启动 localhost 本地工程和 AI 代理服务 |
+| `npm run build` | 运行 TypeScript 检查并构建生产版本 |
+| `npm run preview` | 使用 Vite 预览生产构建 |
+| `npm run test:local` | 运行本地服务冒烟测试 |
 
-## Project Structure
+## 项目结构
 
 ```text
 src/
-├── components/          # React UI, pages, editors, diagrams, and local workspace panels
-├── data/                # Chip specifications, code templates, and driver templates
-├── services/            # AI, PDF, export, and local-service clients
-├── store/               # Zustand application stores
-├── types/               # Domain types for hardware, projects, and AI services
-└── App.tsx              # HashRouter routes
+├── components/          # React UI、页面、编辑器、图表和本地工作区组件
+├── data/                # 芯片规格、代码模板和驱动模板
+├── services/            # AI、PDF、导出和本地服务客户端
+├── store/               # Zustand 状态存储
+├── types/               # 硬件、项目和 AI 服务领域类型
+└── App.tsx              # HashRouter 路由
 server/
-├── index.mjs            # Local filesystem service, analyzer, backups, and builds
-└── smoke-test.mjs       # Self-contained local API smoke test
+├── index.mjs            # AI 代理、本地文件服务、分析、备份和构建
+└── smoke-test.mjs       # 独立本地 API 冒烟测试
 docs/
-└── LOCAL_API.md         # Local service API reference
+└── LOCAL_API.md         # 本地服务 API 文档
 examples/
-└── esp32-smart-environment/  # PlatformIO analysis example
+└── esp32-smart-environment/  # PlatformIO 分析示例
 public/
-└── fonts/              # Fonts used by PDF export
+├── fonts/               # PDF 导出字体
+└── sponsor.png          # VPS.Town 赞助横幅
 ```
 
-## Security Boundaries
+## 安全边界
 
-The local service is designed for a local development workflow, not as a general remote file server:
+localhost 服务面向本地开发流程，不是通用远程文件服务器：
 
-- It binds to `127.0.0.1` only.
-- It rejects non-local browser origins.
-- Every path is normalized and checked against the selected workspace.
-- Scans skip `.git`, `node_modules`, build outputs, and backup directories.
-- Text reads and request bodies have size limits.
-- File saves compare the original modification time to avoid overwriting external edits.
-- Builds use fixed server-side profiles instead of arbitrary commands or arguments.
-- The AI provider does not receive local files unless the user explicitly starts an AI analysis.
+- 只绑定 `127.0.0.1`。
+- 拒绝非本地浏览器来源。
+- 所有路径都会规范化，并检查是否位于授权工作区内。
+- 扫描会跳过 `.git`、`node_modules`、构建输出和备份目录。
+- 文本读取和请求体均有大小限制。
+- 保存文件前会比较原始修改时间，避免覆盖外部修改。
+- 构建使用服务端固定配置，不接受任意命令或参数。
+- 用户未主动发起 AI 分析时，AI 服务商不会收到本地文件内容。
+- API Key 不写入仓库、本地服务配置或操作日志。
 
-### Operational notes
+### 运行注意事项
 
-- Backups are written to `.metacore-backups` inside the selected workspace.
-- Build verification can create normal tool output such as `.pio`, `build`, or generated artifacts.
-- Clearing browser storage removes saved projects and AI configuration from the browser.
-- Static hosting only provides browser features; the local workspace page still requires `npm run dev:server` on the user's machine.
-- API keys must not be committed to this repository or placed in the example project.
+- 备份写入所选工作区内的 `.metacore-backups`。
+- 构建验证可能生成 `.pio`、`build` 等正常工具输出。
+- 清除浏览器存储会删除浏览器内保存的项目和 AI 配置。
+- 静态托管只能提供浏览器功能；本地工作区和 AI 代理仍需用户机器运行 `npm run dev:server`。
+- API Key 不得提交到仓库或写入示例工程。
 
-## Testing
+## 测试
 
-Run the local service smoke test:
+运行本地服务冒烟测试：
 
 ```bash
 npm run test:local
 ```
 
-The test creates a temporary PlatformIO-like project and verifies workspace setup, directory listing, ESP32 and IoT protocol detection, dependency extraction, file writing with backup, report generation, and build profile detection.
+测试会创建临时 PlatformIO 风格工程，并验证工作区设置、目录读取、ESP32 和物联网协议识别、依赖提取、文件写入与备份、报告生成、构建配置检测、AI Chat Completions、Responses API、模型列表和上游错误处理。
 
-Run the production build before submitting changes:
+提交改动前运行生产构建：
 
 ```bash
 npm run build
 ```
 
-## Versioning
+## 版本规范
 
-MetaCore AI follows [Semantic Versioning](https://semver.org/):
+MetaCore AI 遵循[语义化版本](https://semver.org/lang/zh-CN/)：
 
-- **Major** (`2.0.0`): incompatible architecture or workflow changes
-- **Minor** (`2.1.0`): backward-compatible features
-- **Patch** (`2.0.1`): backward-compatible fixes and documentation corrections
+- **主版本** `2.0.0`：不兼容的架构或工作流变化
+- **次版本** `2.1.0`：向后兼容的新功能
+- **修订版本** `2.0.1`：向后兼容的问题修复和文档调整
 
-The canonical application version is stored in `package.json`. The frontend and localhost service read this value at runtime. Release-facing scripts and the changelog should be updated in the same release commit.
+`package.json` 是应用版本的唯一来源。前端和 localhost 服务会在运行时读取该版本。发布脚本和更新日志应在同一个发布提交中同步更新。
 
-## Changelog
+## 更新日志
 
-See [`CHANGELOG.md`](CHANGELOG.md) for release history and migration notes.
+版本历史和迁移说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-## Troubleshooting
+## 故障排查
 
-### AI generation fails
+### AI 生成失败
 
-- Confirm an active provider and API key on `设置`.
-- Check the provider endpoint and model name.
-- For Ollama, start `ollama serve` and confirm the model is installed.
-- Check browser developer tools for CORS or provider-side errors.
+- 确认`设置`页面已有测试成功并处于`使用中`的 AI 服务。
+- 确认 `npm run dev:server` 正在运行。
+- 检查 Base URL、模型名称和 API 协议。
+- CCH / Codex / GPT-5.5 服务应使用 Responses API。
+- 使用`读取模型`确认中转平台实际返回的模型 ID。
+- Ollama 用户应启动 `ollama serve`，并确认模型已安装。
+- `429` 表示服务商限流或繁忙；`503 No available providers` 表示中转平台没有可用上游通道。
 
-### The local page says the service is offline
+### 本地页面显示服务离线
 
-Start the service in the project directory:
+在项目目录执行：
 
 ```bash
 npm run dev:server
 ```
 
-Then click `刷新连接` in the local workspace page.
+然后在`本地`页面点击`刷新连接`。
 
-### A build profile is disabled
+### 构建配置不可用
 
-The project marker may exist, but the corresponding tool is not available in `PATH`. Install PlatformIO, ESP-IDF, or CMake and restart the local service.
+工程标志文件可能存在，但对应工具不在 `PATH`。安装 PlatformIO、ESP-IDF 或 CMake 后，重新启动本地服务。
 
-## Limitations
+## 已知限制
 
-- Static analysis is rule-based and cannot fully understand complex macros, generated code, or every conditional compilation path.
-- Pin validation depends on the detected chip and the available local knowledge base.
-- Arduino CLI compilation requires an explicit board FQBN and is not enabled as an automatic build profile yet.
-- Generated hardware designs and firmware must be reviewed against the actual datasheet and hardware.
-- This project does not replace electrical safety review, security review, or hardware-in-the-loop testing.
+- 静态分析基于规则，无法完整理解复杂宏、生成代码和所有条件编译路径。
+- 引脚校验依赖识别到的芯片和本地知识库完整度。
+- Arduino CLI 编译需要明确的开发板 FQBN，目前未作为自动构建配置开放。
+- 生成的硬件设计和固件必须根据真实芯片手册和硬件进行复核。
+- 本项目不能替代电气安全评审、安全审计和硬件在环测试。
+- 大模型生成代码和复杂方案可能需要较长时间，具体取决于模型、服务商容量和输出规模。
 
-## Contributing
+## 参与贡献
 
-1. Create a feature branch.
-2. Keep UI changes consistent with the existing React, TypeScript, Tailwind, and Zustand patterns.
-3. Keep local filesystem operations inside the workspace security boundary.
-4. Add or update the local smoke test when changing server behavior.
-5. Run `npm run test:local` and `npm run build` before opening a pull request.
+1. 创建独立功能分支。
+2. UI 改动应保持 React、TypeScript、Tailwind 和 Zustand 的现有风格。
+3. 本地文件系统操作必须保持在授权工作区安全边界内。
+4. 修改服务端行为时，应添加或更新本地冒烟测试。
+5. 提交 Pull Request 前运行 `npm run test:local` 和 `npm run build`。
 
-## License
+## 许可证
 
-The repository currently uses an **All Rights Reserved** notice. The source is published on GitHub for reference and collaboration, but it is not granted an OSI-approved open-source license at this time. Do not redistribute, relicense, or use the code commercially without permission from the copyright holder.
+当前仓库使用 **All Rights Reserved** 声明。源代码公开用于查看和协作，但目前未授予 OSI 认可的开源许可证。未经版权持有人许可，不得重新分发、重新授权或用于商业用途。
 
 © 2026 Leo. All rights reserved.
