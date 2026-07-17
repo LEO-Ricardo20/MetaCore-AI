@@ -2,6 +2,10 @@
 
 [简体中文](./README.md) | [English](./README_EN.md)
 
+<p align="center">
+  <img src="./public/logo.svg" alt="MetaCore AI logo" width="96" />
+</p>
+
 > 面向 ESP32、STM32 与自定义芯片的 AI 硬件架构、固件生成和本地嵌入式工程分析平台。
 
 [![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)](https://react.dev/)
@@ -40,6 +44,7 @@ MetaCore AI 将自然语言硬件需求转化为结构化的嵌入式开发流�
 - [故障排查](#故障排查)
 - [已知限制](#已知限制)
 - [参与贡献](#参与贡献)
+- [GitHub 协作文件](#github-协作文件)
 - [许可证](#许可证)
 
 ## 功能亮点
@@ -224,12 +229,19 @@ server/
 ├── index.mjs            # AI 代理、本地文件服务、分析、备份和构建
 └── smoke-test.mjs       # 独立本地 API 冒烟测试
 docs/
+├── ARCHITECTURE.md      # 模块边界与依赖方向
 └── LOCAL_API.md         # 本地服务 API 文档
 examples/
 └── esp32-smart-environment/  # PlatformIO 分析示例
 public/
 ├── fonts/               # PDF 导出字体
+├── apple-touch-icon.png # Apple 设备主屏图标
+├── logo.svg             # 项目 Logo 和浏览器图标
+├── logo-64.png          # 浏览器 favicon 回退图标
 └── sponsor.png          # VPS.Town 赞助横幅
+.github/
+├── ISSUE_TEMPLATE/      # GitHub Issue 表单
+└── PULL_REQUEST_TEMPLATE.md
 ```
 
 ## 安全边界
@@ -327,8 +339,17 @@ npm run dev:server
 4. 修改服务端行为时，应添加或更新本地冒烟测试。
 5. 提交 Pull Request 前运行 `npm run test:local` 和 `npm run build`。
 
+## GitHub 协作文件
+
+- [贡献指南](CONTRIBUTING.md)：分支、提交、测试和 Pull Request 约定。
+- [架构说明](docs/ARCHITECTURE.md)：前端、本地服务和依赖边界。
+- [安全政策](SECURITY.md)：漏洞和 API Key 等敏感信息的处理方式。
+- [行为准则](CODE_OF_CONDUCT.md)：参与公开协作时的基本要求。
+- `.github/ISSUE_TEMPLATE/`：Bug 和功能请求表单。
+- `.github/PULL_REQUEST_TEMPLATE.md`：Pull Request 检查清单。
+
 ## 许可证
 
-当前仓库使用 **All Rights Reserved** 声明。源代码公开用于查看和协作，但目前未授予 OSI 认可的开源许可证。未经版权持有人许可，不得重新分发、重新授权或用于商业用途。
+当前仓库使用 **All Rights Reserved** 声明。源代码公开用于查看和协作，但目前未授予 OSI 认可的开源许可证。未经版权持有人许可，不得重新分发、重新授权或用于商业用途。完整文本见 [`LICENSE`](LICENSE)。
 
 © 2026 Leo. All rights reserved.

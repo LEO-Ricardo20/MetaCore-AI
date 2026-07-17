@@ -2,6 +2,10 @@
 
 [English](./README_EN.md) | [简体中文](./README.md)
 
+<p align="center">
+  <img src="./public/logo.svg" alt="MetaCore AI logo" width="96" />
+</p>
+
 > AI-assisted hardware architecture and embedded project analysis for ESP32, STM32, and custom chips.
 
 面向 ESP32、STM32 与自定义芯片的 AI 硬件方案生成、固件设计和本地嵌入式工程分析平台。
@@ -42,6 +46,7 @@ The browser application handles the product interface and AI workflows. An optio
 - [Troubleshooting](#troubleshooting)
 - [Limitations](#limitations)
 - [Contributing](#contributing)
+- [GitHub Collaboration Files](#github-collaboration-files)
 - [License](#license)
 
 ## Highlights
@@ -211,12 +216,19 @@ server/
 ├── index.mjs            # Local filesystem service, analyzer, backups, and builds
 └── smoke-test.mjs       # Self-contained local API smoke test
 docs/
+├── ARCHITECTURE.md      # Module boundaries and dependency direction
 └── LOCAL_API.md         # Local service API reference
 examples/
 └── esp32-smart-environment/  # PlatformIO analysis example
 public/
 ├── fonts/              # Fonts used by PDF export
+├── apple-touch-icon.png # Apple touch icon
+├── logo.svg            # Project Logo and browser icon
+├── logo-64.png         # Browser favicon fallback
 └── sponsor.png         # VPS.Town sponsor banner
+.github/
+├── ISSUE_TEMPLATE/     # GitHub issue forms
+└── PULL_REQUEST_TEMPLATE.md
 ```
 
 ## Security Boundaries
@@ -309,8 +321,17 @@ The project marker may exist, but the corresponding tool is not available in `PA
 4. Add or update the local smoke test when changing server behavior.
 5. Run `npm run test:local` and `npm run build` before opening a pull request.
 
+## GitHub Collaboration Files
+
+- [Contributing guide](CONTRIBUTING.md): Branch, commit, testing, and pull request conventions.
+- [Architecture guide](docs/ARCHITECTURE.md): Frontend, localhost service, and dependency boundaries.
+- [Security policy](SECURITY.md): Handling vulnerabilities, API keys, and sensitive information.
+- [Code of conduct](CODE_OF_CONDUCT.md): Basic expectations for public collaboration.
+- `.github/ISSUE_TEMPLATE/`: Bug report and feature request forms.
+- `.github/PULL_REQUEST_TEMPLATE.md`: Pull request checklist.
+
 ## License
 
-The repository currently uses an **All Rights Reserved** notice. The source is published on GitHub for reference and collaboration, but it is not granted an OSI-approved open-source license at this time. Do not redistribute, relicense, or use the code commercially without permission from the copyright holder.
+The repository currently uses an **All Rights Reserved** notice. The source is published on GitHub for reference and collaboration, but it is not granted an OSI-approved open-source license at this time. Do not redistribute, relicense, or use the code commercially without permission from the copyright holder. See [`LICENSE`](LICENSE) for the full text.
 
 © 2026 Leo. All rights reserved.

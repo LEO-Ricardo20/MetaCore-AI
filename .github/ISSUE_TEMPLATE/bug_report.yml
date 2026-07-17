@@ -1,0 +1,72 @@
+name: Bug report
+description: Report a reproducible MetaCore AI problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Remove API keys, tokens, private source files, and personal data before submitting.
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem description
+      description: Explain what happened and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Configure ...
+        3. Click ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Hardware scheme generation
+        - Firmware generation
+        - Flow visualization or AI chat
+        - Local workspace analysis
+        - Chip or driver management
+        - Settings or AI provider
+        - Documentation or startup
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: v2.0.0 or commit hash
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Windows 11, Node.js 20, Chrome 126
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste sanitized browser, Vite, or localhost service logs.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed API keys, credentials, private source code, and personal data.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true

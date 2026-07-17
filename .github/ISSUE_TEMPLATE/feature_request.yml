@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose an improvement to MetaCore AI
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: Describe the engineering workflow or user problem this feature should improve.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain the expected behavior and affected modules.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: List existing workarounds or alternative designs.
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Project boundaries
+      options:
+        - label: The proposal does not require committing API keys or private local data.
+          required: true
+        - label: I considered hardware, filesystem, and AI-provider safety implications.
+          required: true

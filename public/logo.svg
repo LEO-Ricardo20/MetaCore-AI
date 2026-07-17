@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">MetaCore AI</title>
+  <desc id="desc">A lightning bolt inside a blue and cyan rounded square.</desc>
+  <defs>
+    <linearGradient id="background" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f46e5" />
+      <stop offset="0.52" stop-color="#06b6d4" />
+      <stop offset="1" stop-color="#60a5fa" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#2563eb" flood-opacity="0.28" />
+    </filter>
+  </defs>
+  <rect x="5" y="5" width="54" height="54" rx="16" fill="url(#background)" filter="url(#shadow)" />
+  <path
+    d="M35.5 13 18.5 34.5h11L27.5 51 45.5 29h-11l1-16Z"
+    fill="none"
+    stroke="#071a35"
+    stroke-width="3.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

@@ -4,6 +4,19 @@ All notable changes to MetaCore AI are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-MM-DD`.
 
+## [Unreleased]
+
+### Added
+
+- Unified MetaCore AI SVG, browser favicon, and Apple touch icon assets.
+- Reusable `MetaCoreLogo` component for consistent application branding.
+- GitHub issue forms, pull request template, contribution guide, security policy, code of conduct, and repository license file.
+
+### Changed
+
+- Reused the shared brand component in the sidebar and About page.
+- Expanded the Chinese and English README files with project branding and GitHub collaboration documentation.
+
 ## [2.0.0] - 2026-07-16
 
 ### Added

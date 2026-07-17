@@ -1,10 +1,11 @@
 /** 侧边栏导航 — 包含路由链接、主题切换和版本号 */
 
 import { NavLink } from 'react-router-dom'
-import { Cpu, Code2, GitBranch, Settings, Zap, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon, Layers, HardDrive } from 'lucide-react'
+import { Cpu, Code2, GitBranch, Settings, FolderOpen, BookOpen, Info, CircuitBoard, Sun, Moon, Layers, HardDrive } from 'lucide-react'
+import MetaCoreLogo from '@/components/brand/MetaCoreLogo'
 import { useThemeStore } from '@/store/themeStore'
 import { cn } from '@/lib/utils'
-import { APP_VERSION_LABEL } from '@/config/app'
+import { APP_NAME, APP_VERSION_LABEL } from '@/config/app'
 
 const nav = [
   { to: '/projects', icon: FolderOpen, label: '项目', color: 'cyan' },
@@ -43,9 +44,7 @@ export default function Sidebar() {
     )}>
       {/* Logo */}
       <div className="mb-5 flex flex-col items-center gap-1">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-cyan-500 to-indigo-400 flex items-center justify-center shadow-lg logo-glow">
-          <Zap size={18} className="text-white" />
-        </div>
+        <MetaCoreLogo size="sm" animated title={APP_NAME} />
       </div>
 
       {/* Nav */}

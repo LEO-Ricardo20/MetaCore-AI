@@ -1,7 +1,8 @@
-import { Zap, Cpu, Code2, GitBranch, Download, MessageSquare, Palette, FolderOpen, Shield, Heart, AlertTriangle, HardDrive, Terminal, HeartHandshake, ExternalLink } from 'lucide-react'
+import { Cpu, Code2, GitBranch, Download, MessageSquare, Palette, FolderOpen, Shield, Heart, AlertTriangle, HardDrive, Terminal, HeartHandshake, ExternalLink } from 'lucide-react'
+import MetaCoreLogo from '@/components/brand/MetaCoreLogo'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
-import { APP_VERSION_LABEL } from '@/config/app'
+import { APP_DESCRIPTION, APP_NAME, APP_SPONSOR, APP_VERSION_LABEL } from '@/config/app'
 
 const FEATURES = [
   { icon: Cpu, color: 'indigo', title: '硬件方案生成', desc: '自然语言描述需求，AI 自动生成引脚分配、BOM 清单、接线对照表' },
@@ -45,9 +46,6 @@ const AI_PROVIDERS = [
   { name: 'Ollama', desc: '本地部署，完全离线' },
 ]
 
-const SPONSOR_IMAGE = '/sponsor.png'
-const SPONSOR_WEBSITE = 'https://vps.town/'
-
 export default function AboutPage() {
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
@@ -58,14 +56,12 @@ export default function AboutPage() {
 
         {/* 头部 */}
         <div className="text-center space-y-4 fade-in-up">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-cyan-500 to-indigo-400 shadow-lg shadow-indigo-500/25">
-            <Zap size={28} className="text-white" />
-          </div>
+          <MetaCoreLogo size="lg" animated />
           <h1 className={cn('text-3xl font-bold', isDark ? 'text-white' : 'text-slate-800')}>
-            MetaCore AI
+            {APP_NAME}
           </h1>
           <p className={cn('text-sm max-w-lg mx-auto leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>
-            AI 辅助的嵌入式硬件架构与工程分析平台，从需求、方案、代码和流程图延伸到本地工程诊断与构建验证。
+            {APP_DESCRIPTION}
           </p>
           <div className={cn(
             'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono',
@@ -184,20 +180,20 @@ export default function AboutPage() {
               <h2 className={cn('text-sm font-semibold', isDark ? 'text-slate-200' : 'text-slate-700')}>赞助支持</h2>
             </div>
             <p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>
-              VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、个人站长及项目团队提供稳定、灵活的云计算资源，适用于网站部署、应用托管、开发测试以及个人项目运行等场景。感谢 VPS.Town 对 MetaCore AI 项目开发与开源工作的支持。
+              {APP_SPONSOR.description}
             </p>
             <a
-              href={SPONSOR_WEBSITE}
+              href={APP_SPONSOR.website}
               target="_blank"
               rel="noreferrer"
               className="block overflow-hidden rounded-lg border border-emerald-500/20 hover:border-emerald-400/60 transition-colors"
-              aria-label="访问 VPS.Town 官网"
+              aria-label={`访问 ${APP_SPONSOR.name} 官网`}
             >
-              <img src={SPONSOR_IMAGE} alt="VPS.Town" className="w-full h-auto block" />
+              <img src={APP_SPONSOR.image} alt={APP_SPONSOR.name} className="w-full h-auto block" />
             </a>
             <div className="flex flex-wrap gap-2">
               <a
-                href={SPONSOR_WEBSITE}
+                href={APP_SPONSOR.website}
                 target="_blank"
                 rel="noreferrer"
                 className={cn(
@@ -205,7 +201,7 @@ export default function AboutPage() {
                   isDark ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                 )}
               >
-                <ExternalLink size={13} /> VPS.Town 官网
+                <ExternalLink size={13} /> {APP_SPONSOR.name} 官网
               </a>
             </div>
           </div>
