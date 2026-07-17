@@ -184,7 +184,7 @@ export default function AboutPage() {
               <h2 className={cn('text-sm font-semibold', isDark ? 'text-slate-200' : 'text-slate-700')}>赞助支持</h2>
             </div>
             <p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>
-              感谢 VPS.Town 对 MetaCore AI 开源项目的支持。赞助商资源与社区入口如下。
+              VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、个人站长及项目团队提供稳定、灵活的云计算资源，适用于网站部署、应用托管、开发测试以及个人项目运行等场景。感谢 VPS.Town 对 MetaCore AI 项目开发与开源工作的支持。
             </p>
             <a
               href={SPONSOR_WEBSITE}

@@ -89,7 +89,7 @@ flowchart LR
 
 ## 赞助支持
 
-感谢 VPS.Town 对 MetaCore AI 项目开发的支持。
+VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、个人站长及项目团队提供稳定、灵活的云计算资源，适用于网站部署、应用托管、开发测试以及个人项目运行等场景。感谢 VPS.Town 对 MetaCore AI 项目开发与开源工作的支持。
 
 <a href="https://vps.town/" target="_blank" rel="noreferrer">
   <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />

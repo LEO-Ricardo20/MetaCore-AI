@@ -90,7 +90,7 @@ Version 2 introduces the optional localhost engineering service, local project d
 
 ## Sponsor
 
-Thanks to VPS.Town for supporting the MetaCore AI project.
+VPS.Town is a platform focused on VPS and cloud server services, providing stable and flexible cloud resources for developers, personal website owners, and project teams. Its services are suitable for website deployment, application hosting, development and testing, and personal project operations. We thank VPS.Town for supporting the development and open-source work of MetaCore AI.
 
 <a href="https://vps.town/" target="_blank" rel="noreferrer">
   <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />
