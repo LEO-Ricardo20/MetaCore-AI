@@ -1,4 +1,4 @@
-import { Zap, Cpu, Code2, GitBranch, Download, MessageSquare, Palette, FolderOpen, Shield, Heart, AlertTriangle, HardDrive, Terminal } from 'lucide-react'
+import { Zap, Cpu, Code2, GitBranch, Download, MessageSquare, Palette, FolderOpen, Shield, Heart, AlertTriangle, HardDrive, Terminal, HeartHandshake, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
 import { APP_VERSION_LABEL } from '@/config/app'
@@ -44,6 +44,9 @@ const AI_PROVIDERS = [
   { name: 'OpenAI', desc: 'GPT-4o 系列' },
   { name: 'Ollama', desc: '本地部署，完全离线' },
 ]
+
+const SPONSOR_IMAGE = '/sponsor.png'
+const SPONSOR_WEBSITE = 'https://vps.town/'
 
 export default function AboutPage() {
   const { theme } = useThemeStore()
@@ -166,6 +169,44 @@ export default function AboutPage() {
                   <span className={cn('text-[10px]', isDark ? 'text-slate-600' : 'text-slate-400')}>{p.desc}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 赞助支持 */}
+        <div className="fade-in-up" style={{ animationDelay: '180ms' }}>
+          <div className={cn(
+            'glass-card p-5 space-y-4',
+            isDark ? 'border-emerald-500/15 bg-emerald-500/5' : 'bg-white/80 border-emerald-200/70'
+          )}>
+            <div className="flex items-center gap-2">
+              <HeartHandshake size={15} className="text-emerald-400" />
+              <h2 className={cn('text-sm font-semibold', isDark ? 'text-slate-200' : 'text-slate-700')}>赞助支持</h2>
+            </div>
+            <p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>
+              感谢 VPS.Town 对 MetaCore AI 开源项目的支持。赞助商资源与社区入口如下。
+            </p>
+            <a
+              href={SPONSOR_WEBSITE}
+              target="_blank"
+              rel="noreferrer"
+              className="block overflow-hidden rounded-lg border border-emerald-500/20 hover:border-emerald-400/60 transition-colors"
+              aria-label="访问 VPS.Town 官网"
+            >
+              <img src={SPONSOR_IMAGE} alt="VPS.Town" className="w-full h-auto block" />
+            </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={SPONSOR_WEBSITE}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
+                  isDark ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                )}
+              >
+                <ExternalLink size={13} /> VPS.Town 官网
+              </a>
             </div>
           </div>
         </div>

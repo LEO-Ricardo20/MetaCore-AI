@@ -17,9 +17,9 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
         {/* 页头 */}
-        <div className="mb-6 slide-in-left">
+        <div className="mb-5 slide-in-left">
           <div className="flex items-center gap-2 mb-2">
             <div className={cn(
               'w-6 h-6 rounded-lg flex items-center justify-center',
@@ -34,27 +34,24 @@ export default function SettingsPage() {
               Configuration
             </span>
           </div>
-          <h1 className={cn('text-2xl font-bold mb-1', isDark ? 'text-white' : 'text-slate-800')}>AI 服务配置</h1>
-          <p className={cn('text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>
-            配置 API Key 后即可使用对应服务。支持 DeepSeek、硅基流动、通义千问、OpenAI、Ollama。
-          </p>
-        </div>
-
-        {/* 添加按钮 */}
-        <div className="mb-5">
-          <button
-            onClick={() => setAdding(true)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all shadow-lg',
-              'bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white hover:-translate-y-0.5 active:translate-y-0'
-            )}
-          >
-            <Plus size={16} /> 添加服务
-          </button>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h1 className={cn('text-xl sm:text-2xl font-bold mb-1', isDark ? 'text-white' : 'text-slate-800')}>AI 服务配置</h1>
+              <p className={cn('text-xs sm:text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                测试连接成功后再启用服务。本地运行推荐同时启动 localhost 工程服务，以避免浏览器跨域限制。
+              </p>
+            </div>
+            <button
+              onClick={() => setAdding(true)}
+              className="h-9 flex-shrink-0 inline-flex items-center justify-center gap-2 px-3 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+            >
+              <Plus size={15} /> 添加服务
+            </button>
+          </div>
         </div>
 
         {/* 服务列表 */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5 pb-6">
           {services.map((svc) => (
             <ServiceCard key={svc.id} service={svc} onEdit={() => setEditing(svc)} />
           ))}

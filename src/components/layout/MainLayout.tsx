@@ -5,7 +5,7 @@ export default function MainLayout() {
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-auto bg-gradient-base">
+      <main className="min-w-0 flex-1 overflow-auto bg-gradient-base">
         <Outlet />
       </main>
     </div>

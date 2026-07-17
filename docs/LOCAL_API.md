@@ -18,6 +18,52 @@
 
 返回最近的分析、写入、恢复和构建操作记录。
 
+## AI 代理
+
+### `POST /ai/call`
+
+通过本地服务调用配置的 AI 服务，避免浏览器跨域限制。支持 OpenAI Responses API，以及 DeepSeek、通义千问、硅基流动、Ollama 和自定义 OpenAI 兼容服务。自定义服务可以通过 `apiMode` 选择 `responses` 或 `chat-completions`；未设置时，OpenAI 和 `autobits.cc` 自动使用 Responses API，其他服务默认使用 Chat Completions。
+
+```json
+{
+  "service": {
+    "provider": "deepseek",
+    "apiKey": "sk-...",
+    "baseURL": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "apiMode": "chat-completions"
+  },
+  "messages": [
+    { "role": "user", "content": "Reply with OK only." }
+  ],
+  "temperature": 0
+}
+```
+
+成功时返回：
+
+```json
+{
+  "content": "OK"
+}
+```
+
+本地服务只把 API Key 转发给配置中的目标服务商，不会把 Key 写入操作日志。日志仅记录服务商、模型和目标主机名。Ollama 可以省略 API Key，其他服务默认要求提供 API Key。单次请求超时时间为 90 秒。
+
+前端当前会在浏览器本地配置中保存用户填写的服务信息。请勿在共享电脑上保存私人 API Key，也不要把包含真实 Key 的配置、截图或日志提交到 GitHub。
+
+### `POST /ai/models`
+
+读取服务商 OpenAI 兼容的 `GET {baseURL}/models` 模型列表。请求体只需要传入 `service` 配置，成功时返回按模型 ID 排序的字符串数组：
+
+```json
+{
+  "models": ["gpt-example", "gpt-example-pro"]
+}
+```
+
+中转平台可能使用自定义模型别名，也可能暂时没有可用的上游通道。应优先使用该接口返回的模型 ID；列表中存在某个模型，只表示平台声明支持，不保证每次调用都有可用上游容量。
+
 ## 工作区
 
 ### `GET /workspace/current`

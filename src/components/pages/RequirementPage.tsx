@@ -68,6 +68,7 @@ export default function RequirementPage() {
     const svc = getActive()
     if (!svc) { setError('请先在设置页配置并选择 AI 服务'); return }
     setError('')
+    setPipelineStep('scheme')
     // 修复：将手选驱动一起传入 createProject，避免被覆盖
     createProject(req, target, format, pickedDriverIds)
     setGenerating('scheme', true)
@@ -84,25 +85,38 @@ export default function RequirementPage() {
       setScheme(scheme)
     } catch (e: any) {
       setError(e.message)
-      return
-    } finally {
       setGenerating('scheme', false)
+      setPipelineStep('')
+      return
     }
+
+    if (!autoPipeline) {
+      setGenerating('scheme', false)
+      setPipelineStep('')
+    }
+
     // 一键流水线：方案完成后自动生成代码 → 流程图
     if (autoPipeline && scheme) {
       try {
         setPipelineStep('code')
+        setGenerating('code', true)
         const currentProject = useProjectStore.getState().project!
         const chipSpec = getSpec(target) ?? undefined
         const codeResult = await runCodegen(svc, currentProject, chipSpec)
         useProjectStore.getState().setCodeFiles(codeResult.files)
+        setGenerating('code', false)
         setPipelineStep('flow')
+        setGenerating('flow', true)
         const flowResult = await runFlowgen(svc, codeResult.files)
         useProjectStore.getState().setFlowData(flowResult.nodes, flowResult.edges)
+        setGenerating('flow', false)
         navigate('/flow')
       } catch (e: any) {
         setError('流水线中断：' + e.message)
       } finally {
+        setGenerating('scheme', false)
+        setGenerating('code', false)
+        setGenerating('flow', false)
         setPipelineStep('')
       }
     }
@@ -283,7 +297,13 @@ export default function RequirementPage() {
             <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full progress-bar" />
             </div>
-            <p className="text-sm text-slate-400">AI 正在分析需求并设计方案...</p>
+            <p className="text-sm text-slate-400">
+              {pipelineStep === 'code'
+                ? '硬件方案已完成，AI 正在生成工程代码...'
+                : pipelineStep === 'flow'
+                  ? '代码已完成，AI 正在生成执行流程图...'
+                  : 'AI 正在分析需求并设计硬件方案...'}
+            </p>
           </div>
         )}
 

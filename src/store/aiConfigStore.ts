@@ -9,7 +9,7 @@ interface AIConfigState {
   addService: (svc: Omit<AIServiceConfig, 'id'>) => void
   updateService: (id: string, svc: Partial<AIServiceConfig>) => void
   removeService: (id: string) => void
-  setActive: (id: string) => void
+  setActive: (id: string | null) => void
   getActive: () => AIServiceConfig | null
 }
 
@@ -39,7 +39,11 @@ export const useAIConfigStore = create<AIConfigState>()(
 
       getActive: () => {
         const { services, activeServiceId } = get()
-        return services.find((s) => s.id === activeServiceId && s.enabled && s.apiKey) ?? null
+        return services.find((s) => (
+          s.id === activeServiceId
+          && s.enabled
+          && (s.provider === 'ollama' || Boolean(s.apiKey.trim()))
+        )) ?? null
       }
     }),
     { name: 'metacore-ai-config' }

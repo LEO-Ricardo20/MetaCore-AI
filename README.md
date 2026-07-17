@@ -30,6 +30,7 @@ The browser application handles the product interface and AI workflows. An optio
 - [Quick Start](#quick-start)
 - [Local Engineering Mode](#local-engineering-mode)
 - [AI Providers](#ai-providers)
+- [Sponsor](#sponsor)
 - [Example Project](#example-project)
 - [Commands](#commands)
 - [Security Boundaries](#security-boundaries)
@@ -150,7 +151,19 @@ Configure providers from the `设置` page. The current client supports:
 - Ollama-compatible local models
 - Custom OpenAI-compatible endpoints
 
-AI keys are stored in the browser's `localStorage` by the current implementation. Direct AI requests are sent from the browser to the configured provider. Do not use a shared browser profile for production credentials, and review the provider's privacy policy before sending source code or datasheets for analysis.
+AI keys are stored in the browser's `localStorage` by the current implementation. Browser storage is outside the Git working tree and is not included by `git add`, commit, or push. When the localhost service is running, AI requests use the local proxy; the service forwards the key only to the configured provider and does not persist it or write it to operation logs. If the proxy is unavailable, the client may fall back to a browser-direct request when the provider permits CORS.
+
+Do not use a shared browser profile for production credentials. Clear the site's browser data before handing the computer to another user, never place real keys in source files, screenshots, issues, or exported configuration, and review the provider's privacy policy before sending source code or datasheets for analysis.
+
+## Sponsor
+
+Thanks to VPS.Town for supporting the MetaCore AI project.
+
+<a href="https://vps.town/" target="_blank" rel="noreferrer">
+  <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />
+</a>
+
+- [VPS.Town official website](https://vps.town/)
 
 ## Typical Workflow
 

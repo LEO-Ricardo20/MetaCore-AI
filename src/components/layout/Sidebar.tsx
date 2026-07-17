@@ -38,7 +38,7 @@ export default function Sidebar() {
 
   return (
     <aside className={cn(
-      'w-[72px] flex flex-col items-center py-5 gap-1 border-r relative transition-colors duration-300',
+      'w-[72px] shrink-0 flex flex-col items-center py-5 gap-1 border-r relative transition-colors duration-300',
       isDark ? 'bg-[#080c14] border-slate-800/40' : 'bg-[#e8effe] border-indigo-100/50'
     )}>
       {/* Logo */}
