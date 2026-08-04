@@ -68,7 +68,7 @@ export interface DetectedPeripheral {
   files: string[]
 }
 
-export interface DetectedProtocol extends DetectedPeripheral {}
+export type DetectedProtocol = DetectedPeripheral
 
 export interface DetectedDependency {
   name: string

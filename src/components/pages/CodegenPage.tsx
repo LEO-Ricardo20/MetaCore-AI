@@ -1,25 +1,23 @@
 /** 代码生成页 — 基于硬件方案生成模块化工程代码，支持自检验证 */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useAIConfigStore } from '@/store/aiConfigStore'
 import { useChipStore } from '@/store/chipStore'
 import { useThemeStore } from '@/store/themeStore'
-import { callAI } from '@/services/ai/client'
-import { buildCodegenPrompt, buildVerifyPrompt } from '@/services/ai/prompts'
-import { parseJSON } from '@/lib/utils'
-import type { CodeFile } from '@/types/project'
+import { runCodegen } from '@/services/ai/codegen'
 import FileTree from '@/components/codegen/FileTree'
 import CodePreview from '@/components/codegen/CodePreview'
 import ExportButtons from '@/components/codegen/ExportButtons'
-import { Loader2, Code2, AlertCircle, AlertTriangle, Sparkles, Cpu } from 'lucide-react'
+import { Loader2, Code2, AlertCircle, AlertTriangle, Sparkles, Cpu, Square } from 'lucide-react'
 import { matchDriverTemplates, DRIVER_TEMPLATES } from '@/data/driverTemplates'
 import { cn } from '@/lib/utils'
 
 export default function CodegenPage() {
   const navigate = useNavigate()
-  const { project, setCodeFiles, setGenerating, isGeneratingCode } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
+  const { setCodeFiles, setGenerating, isGeneratingCode } = useProjectStore()
   const { getActive } = useAIConfigStore()
   const { getSpec } = useChipStore()
   const { theme } = useThemeStore()
@@ -27,6 +25,9 @@ export default function CodegenPage() {
 
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
+  const generationController = useRef<AbortController | null>(null)
+
+  useEffect(() => () => generationController.current?.abort(), [])
 
   /** 生成代码 + 后台自检一致性 */
   async function handleGenerate() {
@@ -36,33 +37,24 @@ export default function CodegenPage() {
     setError('')
     setWarning('')
     setGenerating('code', true)
+    const controller = new AbortController()
+    generationController.current?.abort()
+    generationController.current = controller
     try {
-      // 第 1 步：生成代码（低温度保证确定性）
       const chipSpec = getSpec(project.target) ?? undefined
-      const prompt = buildCodegenPrompt(project.scheme, project.target, project.format, chipSpec)
-      const raw = await callAI(svc, [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user }
-      ], { temperature: 0.15 })
-      const result = parseJSON<{ files: CodeFile[] }>(raw)
-      if (!result?.files?.length) throw new Error('AI 返回格式解析失败，请重试')
+      const result = await runCodegen(svc, project, chipSpec, { signal: controller.signal })
       setCodeFiles(result.files)
-
-      // 第 2 步：后台自检（不阻塞 UI）
-      try {
-        const verifyRaw = await callAI(svc, [
-          { role: 'user', content: buildVerifyPrompt(project.scheme, result.files) }
-        ], { temperature: 0.1 })
-        const verification = parseJSON<{ consistent: boolean; issues: string[] }>(verifyRaw)
-        if (verification && !verification.consistent && verification.issues.length > 0) {
-          setWarning(`AI 自检发现 ${verification.issues.length} 个潜在问题：\n${verification.issues.join('\n')}`)
-        }
-      } catch { /* 验证失败不影响主流程 */ }
+      if (result.warning) setWarning(result.warning)
     } catch (e: any) {
       setError(e.message)
     } finally {
+      if (generationController.current === controller) generationController.current = null
       setGenerating('code', false)
     }
+  }
+
+  function handleCancelGeneration() {
+    generationController.current?.abort()
   }
 
   if (!project) {
@@ -159,17 +151,16 @@ export default function CodegenPage() {
           )}
           {project.codeFiles.length === 0 ? (
             <button
-              onClick={handleGenerate}
-              disabled={isGeneratingCode}
+              onClick={isGeneratingCode ? handleCancelGeneration : handleGenerate}
               className={cn(
                 'flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-xl transition-all',
                 isGeneratingCode
-                  ? isDark ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  ? 'bg-red-600 hover:bg-red-500 text-white'
                   : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0'
               )}
             >
-              {isGeneratingCode ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              {isGeneratingCode ? 'AI 生成中...' : '生成代码'}
+              {isGeneratingCode ? <Square size={13} /> : <Sparkles size={14} />}
+              {isGeneratingCode ? '取消生成' : '生成代码'}
             </button>
           ) : (
             <ExportButtons />

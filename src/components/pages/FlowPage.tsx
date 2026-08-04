@@ -1,28 +1,29 @@
 /** 流程图页 — 自动分析代码执行流程，生成可交互的可视化节点图 */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useAIConfigStore } from '@/store/aiConfigStore'
 import { useThemeStore } from '@/store/themeStore'
-import { callAI } from '@/services/ai/client'
-import { buildFlowPrompt } from '@/services/ai/prompts'
-import { parseJSON } from '@/lib/utils'
-import type { FlowNode, FlowEdge } from '@/types/project'
+import { runFlowgen } from '@/services/ai/flowgen'
 import FlowCanvas from '@/components/flow/FlowCanvas'
 import AIChatPanel from '@/components/flow/AIChatPanel'
-import { Loader2, GitBranch, AlertCircle, MessageSquare, Sparkles, Info } from 'lucide-react'
+import { Loader2, GitBranch, AlertCircle, MessageSquare, Sparkles, Info, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function FlowPage() {
   const navigate = useNavigate()
-  const { project, setFlowData, setGenerating, isGeneratingFlow } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
+  const { setFlowData, setGenerating, isGeneratingFlow } = useProjectStore()
   const { getActive } = useAIConfigStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
 
   const [error, setError] = useState('')
   const [chatOpen, setChatOpen] = useState(false)
+  const generationController = useRef<AbortController | null>(null)
+
+  useEffect(() => () => generationController.current?.abort(), [])
 
   async function handleGenerate() {
     if (!project?.codeFiles.length) return
@@ -30,21 +31,22 @@ export default function FlowPage() {
     if (!svc) { setError('请先在设置页配置并选择 AI 服务'); return }
     setError('')
     setGenerating('flow', true)
+    const controller = new AbortController()
+    generationController.current?.abort()
+    generationController.current = controller
     try {
-      const files = project.codeFiles.map(f => ({ path: f.path, content: f.content }))
-      const prompt = buildFlowPrompt(files)
-      const raw = await callAI(svc, [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user }
-      ], { temperature: 0.2 })
-      const result = parseJSON<{ nodes: FlowNode[]; edges: FlowEdge[] }>(raw)
-      if (!result?.nodes?.length) throw new Error('AI 返回格式解析失败，请重试')
+      const result = await runFlowgen(svc, project.codeFiles, { signal: controller.signal })
       setFlowData(result.nodes, result.edges)
     } catch (e: any) {
       setError(e.message)
     } finally {
+      if (generationController.current === controller) generationController.current = null
       setGenerating('flow', false)
     }
+  }
+
+  function handleCancelGeneration() {
+    generationController.current?.abort()
   }
 
   if (!project?.codeFiles.length) {
@@ -131,17 +133,16 @@ export default function FlowPage() {
 
           {project.flowNodes.length === 0 && (
             <button
-              onClick={handleGenerate}
-              disabled={isGeneratingFlow}
+              onClick={isGeneratingFlow ? handleCancelGeneration : handleGenerate}
               className={cn(
                 'flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-xl transition-all',
                 isGeneratingFlow
-                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                  ? 'bg-red-600 hover:bg-red-500 text-white'
                   : 'bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0'
               )}
             >
-              {isGeneratingFlow ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              {isGeneratingFlow ? 'AI 分析中...' : '生成流程图'}
+              {isGeneratingFlow ? <Square size={13} /> : <Sparkles size={14} />}
+              {isGeneratingFlow ? '取消分析' : '生成流程图'}
             </button>
           )}
         </div>

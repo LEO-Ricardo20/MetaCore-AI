@@ -4,7 +4,7 @@ import type { Project } from '@/types/project'
 // 注册中文字体（黑体）
 Font.register({
   family: 'NotoSansSC',
-  src: '/fonts/simhei.ttf',
+  src: `${import.meta.env.BASE_URL}fonts/simhei.ttf`,
 })
 
 const colors = {
@@ -186,10 +186,6 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
 })
-
-function col(key: string, width: number) {
-  return { key, width }
-}
 
 function HeaderCell({ text, width }: { text: string; width: number }) {
   return (

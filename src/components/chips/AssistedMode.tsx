@@ -6,8 +6,9 @@ import { useAIConfigStore } from '@/store/aiConfigStore'
 import { extractTextFromPdf } from '@/services/pdf/pdfExtractor'
 import { buildChipParsePrompt } from '@/services/ai/prompts'
 import { callAI } from '@/services/ai/client'
-import { parseJSON, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { ChipSpec } from '@/types/hardware'
+import { parseChipSpec } from '@/services/ai/validation'
 import FormMode from './FormMode'
 import {
   FileUp,
@@ -70,8 +71,7 @@ export default function AssistedMode({ onDone }: Props) {
         { role: 'user', content: prompt },
       ], { temperature: 0.2 })
 
-      const spec = parseJSON<ChipSpec>(raw)
-      if (!spec || !spec.name) throw new Error('AI 返回格式解析失败，请重试')
+      const spec = parseChipSpec(raw)
       setPrefilled(spec)
     } catch (e: any) {
       setError(e.message ?? '预填失败')
@@ -171,7 +171,7 @@ export default function AssistedMode({ onDone }: Props) {
       </div>
 
       {/* ---- 下方表单（与 FormMode 一致） ---- */}
-      <FormMode onDone={onDone} initialData={prefilled} />
+      <FormMode key={prefilled?.name ?? 'empty'} onDone={onDone} initialData={prefilled} />
     </div>
   )
 }

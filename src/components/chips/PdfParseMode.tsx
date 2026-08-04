@@ -7,8 +7,9 @@ import { useAIConfigStore } from '@/store/aiConfigStore'
 import { extractTextFromPdf } from '@/services/pdf/pdfExtractor'
 import { buildChipParsePrompt } from '@/services/ai/prompts'
 import { callAI } from '@/services/ai/client'
-import { parseJSON, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { ChipSpec } from '@/types/hardware'
+import { parseChipSpec } from '@/services/ai/validation'
 import {
   FileUp,
   Loader2,
@@ -73,8 +74,7 @@ export default function PdfParseMode({ onDone }: Props) {
       ], { temperature: 0.2 })
 
       // 3. 解析结果
-      const spec = parseJSON<ChipSpec>(raw)
-      if (!spec || !spec.name) throw new Error('AI 返回格式解析失败，请重试')
+      const spec = parseChipSpec(raw)
       setResult(spec)
     } catch (e: any) {
       setError(e.message ?? '解析失败')

@@ -3,21 +3,19 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { CONFIG_PATH, HOST, LIMITS, PACKAGE_META, PORT } from './config.mjs'
+import { corsHeaders, ensureLocalOrigin, json, readBody } from './lib/http.mjs'
+import { normalizeForCompare, resolveExistingInsideWorkspace, toWorkspaceRelative } from './security/workspace-paths.mjs'
+import { createOpenAICompatibleAdapter } from './services/ai-provider.mjs'
 
-const HOST = '127.0.0.1'
-const PORT = Number(process.env.METACORE_LOCAL_PORT ?? 3766)
-const MAX_READ_BYTES = 2 * 1024 * 1024
-const MAX_BODY_BYTES = 3 * 1024 * 1024
-const MAX_SEARCH_BYTES = 512 * 1024
-const MAX_SCAN_FILES = 1800
-const MAX_SCAN_DEPTH = 8
-const MAX_BUILD_OUTPUT = 512 * 1024
-const BUILD_TIMEOUT_MS = 120 * 1000
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const CONFIG_PATH = process.env.METACORE_LOCAL_CONFIG || path.join(__dirname, '.metacore-local.json')
-const PACKAGE_META = JSON.parse(await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8'))
+const {
+  readBytes: MAX_READ_BYTES,
+  searchBytes: MAX_SEARCH_BYTES,
+  scanFiles: MAX_SCAN_FILES,
+  scanDepth: MAX_SCAN_DEPTH,
+  buildOutputBytes: MAX_BUILD_OUTPUT,
+  buildTimeoutMs: BUILD_TIMEOUT_MS,
+} = LIMITS
 
 let workspaceRoot = ''
 const operationLog = []
@@ -142,7 +140,9 @@ async function loadConfig() {
     const raw = await fs.readFile(CONFIG_PATH, 'utf8')
     const cfg = JSON.parse(raw)
     if (typeof cfg.workspaceRoot === 'string') {
-      workspaceRoot = cfg.workspaceRoot
+      const resolved = await fs.realpath(path.resolve(cfg.workspaceRoot))
+      const stat = await fs.stat(resolved)
+      workspaceRoot = stat.isDirectory() ? resolved : ''
     }
   } catch {
     workspaceRoot = ''
@@ -163,6 +163,8 @@ function recordOperation(type, detail = {}, status = 'success') {
   })
   if (operationLog.length > 120) operationLog.length = 120
 }
+
+const aiProvider = createOpenAICompatibleAdapter({ recordOperation })
 
 async function commandAvailable(command) {
   const lookup = process.platform === 'win32' ? 'where.exe' : 'which'
@@ -190,281 +192,6 @@ async function getSystemInfo() {
   }
 }
 
-function normalizeAIBaseURL(value) {
-  let url
-  try {
-    url = new URL(String(value ?? '').trim())
-  } catch {
-    const err = new Error('AI Base URL 必须是有效的网址')
-    err.status = 400
-    throw err
-  }
-  if (!['http:', 'https:'].includes(url.protocol)) {
-    const err = new Error('AI Base URL 仅支持 http:// 或 https://')
-    err.status = 400
-    throw err
-  }
-  if (url.hostname === 'localhost') url.hostname = '127.0.0.1'
-  return url.toString().replace(/\/+$/, '')
-}
-
-function extractProviderError(raw, status) {
-  try {
-    const data = JSON.parse(raw)
-    return data.error?.message || data.message || data.error || `HTTP ${status}`
-  } catch {
-    return raw.trim().slice(0, 500) || `HTTP ${status}`
-  }
-}
-
-function extractOpenAIResponseText(data) {
-  if (typeof data.output_text === 'string' && data.output_text) return data.output_text
-  for (const output of data.output ?? []) {
-    for (const content of output.content ?? []) {
-      if (content.type === 'output_text' && typeof content.text === 'string') return content.text
-    }
-  }
-  return ''
-}
-
-function resolveAIAPIMode(service) {
-  if (service.apiMode === 'responses' || service.apiMode === 'chat-completions') return service.apiMode
-  if (service.provider === 'openai') return 'responses'
-  try {
-    if (service.provider === 'custom' && new URL(service.baseURL).hostname.endsWith('autobits.cc')) return 'responses'
-  } catch {
-    // URL validation reports the actionable error later.
-  }
-  return 'chat-completions'
-}
-
-async function callAIThroughProxy(service, messages, temperature = 0.3) {
-  if (!service || typeof service !== 'object') {
-    const err = new Error('AI 服务配置无效')
-    err.status = 400
-    throw err
-  }
-  if (!Array.isArray(messages) || !messages.length) {
-    const err = new Error('AI 消息不能为空')
-    err.status = 400
-    throw err
-  }
-  if (!service.model || !service.provider) {
-    const err = new Error('AI 模型或服务商不能为空')
-    err.status = 400
-    throw err
-  }
-  if (service.provider !== 'ollama' && !service.apiKey) {
-    const err = new Error('该 AI 服务需要 API Key')
-    err.status = 400
-    throw err
-  }
-
-  const baseURL = normalizeAIBaseURL(service.baseURL)
-  const headers = { 'Content-Type': 'application/json' }
-  if (service.apiKey) headers.Authorization = `Bearer ${service.apiKey}`
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 90 * 1000)
-  let endpoint
-  let body
-  const apiMode = resolveAIAPIMode(service)
-
-  if (apiMode === 'responses') {
-    const systemMessage = messages.find((message) => message.role === 'system')
-    const inputMessages = messages.filter((message) => message.role !== 'system')
-    endpoint = `${baseURL}/responses`
-    body = {
-      model: service.model,
-      input: inputMessages.length === 1 && inputMessages[0].role === 'user'
-        ? inputMessages[0].content
-        : inputMessages,
-    }
-    if (systemMessage) body.instructions = systemMessage.content
-  } else {
-    endpoint = `${baseURL}/chat/completions`
-    body = {
-      model: service.model,
-      messages,
-      stream: false,
-      temperature,
-    }
-  }
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-    const raw = await response.text()
-    if (!response.ok) {
-      const err = new Error(extractProviderError(raw, response.status))
-      err.status = response.status
-      throw err
-    }
-
-    const data = JSON.parse(raw)
-    const content = apiMode === 'responses'
-      ? extractOpenAIResponseText(data)
-      : data.choices?.[0]?.message?.content
-    if (typeof content !== 'string' || !content) {
-      const err = new Error('AI 服务返回成功，但没有可读取的文本内容')
-      err.status = 502
-      throw err
-    }
-    recordOperation('ai.call', {
-      provider: service.provider,
-      model: service.model,
-      apiMode,
-      host: new URL(baseURL).host,
-    })
-    return { content }
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      const err = new Error('AI 服务请求超时（90 秒）')
-      err.status = 504
-      throw err
-    }
-    if (error instanceof TypeError && error.message === 'fetch failed') {
-      const err = new Error(`无法连接 AI 服务（${new URL(baseURL).host}）。请检查 Base URL、网络代理，或确认本地模型服务已经启动。`)
-      err.status = 502
-      throw err
-    }
-    throw error
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
-async function listAIModels(service) {
-  if (!service || typeof service !== 'object' || !service.provider) {
-    const err = new Error('AI 服务配置无效')
-    err.status = 400
-    throw err
-  }
-  if (service.provider !== 'ollama' && !service.apiKey) {
-    const err = new Error('该 AI 服务需要 API Key')
-    err.status = 400
-    throw err
-  }
-
-  const baseURL = normalizeAIBaseURL(service.baseURL)
-  const headers = { Accept: 'application/json' }
-  if (service.apiKey) headers.Authorization = `Bearer ${service.apiKey}`
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30 * 1000)
-
-  try {
-    const response = await fetch(`${baseURL}/models`, { headers, signal: controller.signal })
-    const raw = await response.text()
-    if (!response.ok) {
-      const err = new Error(extractProviderError(raw, response.status))
-      err.status = response.status
-      throw err
-    }
-
-    const data = JSON.parse(raw)
-    const source = Array.isArray(data.data) ? data.data : Array.isArray(data.models) ? data.models : []
-    const models = [...new Set(source
-      .map((item) => typeof item === 'string' ? item : item?.id ?? item?.name)
-      .filter((item) => typeof item === 'string' && item.trim())
-      .map((item) => item.trim()))]
-      .sort((left, right) => left.localeCompare(right))
-      .slice(0, 2000)
-
-    if (!models.length) {
-      const err = new Error('服务商返回了模型列表，但没有可用的模型标识')
-      err.status = 502
-      throw err
-    }
-
-    recordOperation('ai.models', {
-      provider: service.provider,
-      host: new URL(baseURL).host,
-      count: models.length,
-    })
-    return { models }
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      const err = new Error('读取 AI 模型列表超时（30 秒）')
-      err.status = 504
-      throw err
-    }
-    if (error instanceof TypeError && error.message === 'fetch failed') {
-      const err = new Error(`无法连接 AI 服务（${new URL(baseURL).host}）。请检查 Base URL、网络代理，或确认本地模型服务已经启动。`)
-      err.status = 502
-      throw err
-    }
-    throw error
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
-function json(res, status, data, origin = '') {
-  const body = JSON.stringify(data)
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(body),
-    ...corsHeaders(origin),
-  })
-  res.end(body)
-}
-
-function corsHeaders(origin = '') {
-  const headers = {
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '600',
-  }
-  if (isAllowedOrigin(origin)) {
-    headers['Access-Control-Allow-Origin'] = origin
-  }
-  return headers
-}
-
-function isAllowedOrigin(origin = '') {
-  if (!origin) return false
-  try {
-    const url = new URL(origin)
-    return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-  } catch {
-    return false
-  }
-}
-
-function ensureLocalOrigin(req) {
-  const origin = req.headers.origin ?? ''
-  if (!origin) return
-  if (!isAllowedOrigin(origin)) {
-    const err = new Error('拒绝非本机页面访问本地文件服务')
-    err.status = 403
-    throw err
-  }
-}
-
-async function readBody(req) {
-  const chunks = []
-  let size = 0
-  for await (const chunk of req) {
-    size += chunk.length
-    if (size > MAX_BODY_BYTES) {
-      const err = new Error('请求体过大')
-      err.status = 413
-      throw err
-    }
-    chunks.push(chunk)
-  }
-  if (!chunks.length) return {}
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
-function normalizeForCompare(p) {
-  return process.platform === 'win32' ? p.toLowerCase() : p
-}
-
 function requireWorkspace() {
   if (!workspaceRoot) {
     const err = new Error('尚未设置本地工作区')
@@ -474,26 +201,13 @@ function requireWorkspace() {
   return path.resolve(workspaceRoot)
 }
 
-function resolveInsideWorkspace(inputPath = '') {
+async function resolveInsideWorkspace(inputPath = '') {
   const root = requireWorkspace()
-  const target = path.isAbsolute(inputPath)
-    ? path.resolve(inputPath)
-    : path.resolve(root, inputPath || '.')
-
-  const rootCmp = normalizeForCompare(root)
-  const targetCmp = normalizeForCompare(target)
-  if (targetCmp !== rootCmp && !targetCmp.startsWith(rootCmp + path.sep)) {
-    const err = new Error('禁止访问工作区外部路径')
-    err.status = 403
-    throw err
-  }
-  return target
+  return resolveExistingInsideWorkspace(root, inputPath)
 }
 
 function toRelative(target) {
-  const root = requireWorkspace()
-  const rel = path.relative(root, target)
-  return rel ? rel.split(path.sep).join('/') : ''
+  return toWorkspaceRelative(requireWorkspace(), target)
 }
 
 function isTextFile(filePath) {
@@ -521,7 +235,7 @@ function getLanguage(filePath) {
 }
 
 async function listDir(dir = '') {
-  const target = resolveInsideWorkspace(dir)
+  const target = await resolveInsideWorkspace(dir)
   const stat = await fs.stat(target)
   if (!stat.isDirectory()) {
     const err = new Error('目标不是文件夹')
@@ -530,7 +244,8 @@ async function listDir(dir = '') {
   }
 
   const entries = await fs.readdir(target, { withFileTypes: true })
-  const items = await Promise.all(entries.map(async (entry) => {
+  const items = (await Promise.all(entries.map(async (entry) => {
+    if (entry.isSymbolicLink()) return null
     const full = path.join(target, entry.name)
     const itemStat = await fs.stat(full)
     return {
@@ -541,7 +256,7 @@ async function listDir(dir = '') {
       modifiedAt: itemStat.mtimeMs,
       readable: entry.isDirectory() || isTextFile(full),
     }
-  }))
+  }))).filter(Boolean)
 
   items.sort((a, b) => {
     if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
@@ -557,7 +272,7 @@ async function listDir(dir = '') {
 }
 
 async function readFile(filePath = '') {
-  const target = resolveInsideWorkspace(filePath)
+  const target = await resolveInsideWorkspace(filePath)
   const stat = await fs.stat(target)
   if (!stat.isFile()) {
     const err = new Error('目标不是文件')
@@ -631,7 +346,7 @@ async function writeFileSafely(filePath, content, expectedModifiedAt) {
     throw err
   }
 
-  const target = resolveInsideWorkspace(filePath)
+  const target = await resolveInsideWorkspace(filePath)
   assertWritableTextPath(target)
   const stat = await fs.stat(target)
   if (!stat.isFile()) {
@@ -655,7 +370,7 @@ async function writeFileSafely(filePath, content, expectedModifiedAt) {
 async function listBackups() {
   const root = requireWorkspace()
   const backupRoot = path.join(root, '.metacore-backups')
-  let entries = []
+  let entries
   try {
     entries = await fs.readdir(backupRoot, { withFileTypes: true })
   } catch {
@@ -685,11 +400,13 @@ async function restoreBackup(backupId) {
   const root = requireWorkspace()
   const backupDir = path.join(root, '.metacore-backups', backupId)
   const metadata = JSON.parse(await fs.readFile(path.join(backupDir, 'metadata.json'), 'utf8'))
-  const target = resolveInsideWorkspace(metadata.path)
+  const target = await resolveInsideWorkspace(metadata.path)
   assertWritableTextPath(target)
   const source = path.resolve(backupDir, metadata.path)
-  const backupCmp = normalizeForCompare(path.resolve(backupDir))
-  const sourceCmp = normalizeForCompare(source)
+  const realBackupDir = await fs.realpath(backupDir)
+  const realSource = await fs.realpath(source)
+  const backupCmp = normalizeForCompare(realBackupDir)
+  const sourceCmp = normalizeForCompare(realSource)
   if (!sourceCmp.startsWith(backupCmp + path.sep)) {
     const err = new Error('备份文件路径无效')
     err.status = 403
@@ -706,7 +423,7 @@ async function walk(dir, options = {}, state = { files: [], totalFiles: 0 }) {
   const depth = options.depth ?? 0
   if (depth > MAX_SCAN_DEPTH || state.files.length >= MAX_SCAN_FILES) return state
 
-  let entries = []
+  let entries
   try {
     entries = await fs.readdir(dir, { withFileTypes: true })
   } catch {
@@ -716,6 +433,7 @@ async function walk(dir, options = {}, state = { files: [], totalFiles: 0 }) {
   for (const entry of entries) {
     if (state.files.length >= MAX_SCAN_FILES) break
     const full = path.join(dir, entry.name)
+    if (entry.isSymbolicLink()) continue
     if (entry.isDirectory()) {
       if (!SKIP_DIRS.has(entry.name)) {
         await walk(full, { depth: depth + 1 }, state)
@@ -923,7 +641,7 @@ async function detectBuildProfiles() {
   const root = requireWorkspace()
   const profiles = []
   for (const profile of Object.values(BUILD_PROFILES)) {
-    let markerExists = false
+    let markerExists
     try {
       await fs.access(path.join(root, profile.marker))
       markerExists = true
@@ -1319,7 +1037,7 @@ async function setWorkspace(root) {
     err.status = 400
     throw err
   }
-  const resolved = path.resolve(root)
+  const resolved = await fs.realpath(path.resolve(root))
   const stat = await fs.stat(resolved)
   if (!stat.isDirectory()) {
     const err = new Error('工作区必须是文件夹')
@@ -1360,13 +1078,13 @@ async function route(req, res) {
 
   if (req.method === 'POST' && url.pathname === '/api/ai/call') {
     const body = await readBody(req)
-    json(res, 200, await callAIThroughProxy(body.service, body.messages, body.temperature), origin)
+    json(res, 200, await aiProvider.call(body.service, body.messages, body.temperature), origin)
     return
   }
 
   if (req.method === 'POST' && url.pathname === '/api/ai/models') {
     const body = await readBody(req)
-    json(res, 200, await listAIModels(body.service), origin)
+    json(res, 200, await aiProvider.listModels(body.service), origin)
     return
   }
 

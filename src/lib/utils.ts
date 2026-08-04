@@ -16,7 +16,7 @@ export function parseJSON<T>(text: string): T | null {
   } catch { /* 继续尝试 */ }
 
   try {
-    const start = text.search(/[\[{]/)
+    const start = text.search(/[{[]/)
     const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'))
     if (start !== -1 && end > start) {
       return JSON.parse(text.slice(start, end + 1)) as T

@@ -10,6 +10,7 @@ const PORT = 3767
 const API = `http://127.0.0.1:${PORT}/api`
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'metacore-local-test-'))
+const externalRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'metacore-local-external-'))
 const configPath = path.join(tempRoot, 'server-config.json')
 let server
 let mockAIProvider
@@ -103,6 +104,14 @@ try {
     'void setup() { WiFi.begin("demo", "changeme"); Wire.begin(21, 22); }',
     'void loop() {}',
   ].join('\n'), 'utf8')
+  await fs.writeFile(path.join(externalRoot, 'secret.txt'), 'WORKSPACE_ESCAPE', 'utf8')
+  let externalLinkCreated = false
+  try {
+    await fs.symlink(externalRoot, path.join(tempRoot, 'external-link'), process.platform === 'win32' ? 'junction' : 'dir')
+    externalLinkCreated = true
+  } catch (error) {
+    if (!['EPERM', 'EACCES', 'ENOTSUP'].includes(error?.code)) throw error
+  }
 
   server = spawn(process.execPath, ['server/index.mjs'], {
     cwd: projectRoot,
@@ -120,6 +129,12 @@ try {
 
   const listing = await request('/files/list')
   assert.ok(listing.items.some((item) => item.name === 'platformio.ini'))
+  if (externalLinkCreated) {
+    assert.ok(!listing.items.some((item) => item.name === 'external-link'))
+    const escapedRead = await requestRaw('/files/read?path=external-link%2Fsecret.txt')
+    assert.equal(escapedRead.res.status, 403)
+    assert.match(escapedRead.data.error, /工作区外部路径/)
+  }
 
   const analysis = await request('/analyze', { method: 'POST' })
   assert.equal(analysis.primaryProjectType, 'PlatformIO')
@@ -238,4 +253,5 @@ try {
   if (server && !server.killed) server.kill()
   if (mockAIProvider?.listening) await new Promise((resolve) => mockAIProvider.close(resolve))
   await fs.rm(tempRoot, { recursive: true, force: true })
+  await fs.rm(externalRoot, { recursive: true, force: true })
 }

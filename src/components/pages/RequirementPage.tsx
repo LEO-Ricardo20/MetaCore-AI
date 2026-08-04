@@ -1,26 +1,23 @@
 /** 需求生成页 — 输入自然语言需求，AI 生成硬件方案（引脚/BOM/接线） */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useAIConfigStore } from '@/store/aiConfigStore'
 import { useChipStore } from '@/store/chipStore'
 import { useThemeStore } from '@/store/themeStore'
-import { callAI } from '@/services/ai/client'
-import { buildSchemePrompt } from '@/services/ai/prompts'
-import { parseJSON } from '@/lib/utils'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
-import type { HardwareScheme } from '@/types/project'
 import PinTable from '@/components/requirement/PinTable'
 import PinDiagram from '@/components/requirement/PinDiagram'
 import BOMTable from '@/components/requirement/BOMTable'
 import WiringTable from '@/components/requirement/WiringTable'
-import { Loader2, AlertCircle, ChevronRight, Cpu, Sparkles, MapPin, Table2, Settings2, Info, ChevronDown, Layers, Check, Zap } from 'lucide-react'
+import { AlertCircle, ChevronRight, Cpu, Sparkles, MapPin, Table2, Settings2, Info, ChevronDown, Layers, Check, Zap, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DRIVER_TEMPLATES } from '@/data/driverTemplates'
 import { useSettingsStore } from '@/store/settingsStore'
 import { runCodegen } from '@/services/ai/codegen'
 import { runFlowgen } from '@/services/ai/flowgen'
+import { runSchemegen } from '@/services/ai/schemegen'
 
 const FORMATS: { value: ProjectFormat; label: string; desc: string }[] = [
   { value: 'espidf', label: 'ESP-IDF', desc: 'CMake' },
@@ -37,7 +34,8 @@ const EXAMPLES = [
 
 export default function RequirementPage() {
   const navigate = useNavigate()
-  const { project, createProject, setScheme, setGenerating, isGeneratingScheme } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
+  const { createProject, setScheme, setGenerating, isGeneratingScheme } = useProjectStore()
   const { getActive } = useAIConfigStore()
   const { getAllChipNames, getSpec } = useChipStore()
   const { theme } = useThemeStore()
@@ -55,6 +53,9 @@ export default function RequirementPage() {
   const [driverPanelOpen, setDriverPanelOpen] = useState(false)
   const [pickedDriverIds, setPickedDriverIds] = useState<string[]>(project?.selectedDriverIds ?? [])
   const [pipelineStep, setPipelineStep] = useState<'' | 'scheme' | 'code' | 'flow'>('')
+  const generationController = useRef<AbortController | null>(null)
+
+  useEffect(() => () => generationController.current?.abort(), [])
 
   function toggleDriver(id: string) {
     setPickedDriverIds(prev =>
@@ -69,57 +70,47 @@ export default function RequirementPage() {
     if (!svc) { setError('请先在设置页配置并选择 AI 服务'); return }
     setError('')
     setPipelineStep('scheme')
-    // 修复：将手选驱动一起传入 createProject，避免被覆盖
+    const controller = new AbortController()
+    generationController.current?.abort()
+    generationController.current = controller
     createProject(req, target, format, pickedDriverIds)
     setGenerating('scheme', true)
-    let scheme: HardwareScheme | null = null
+    let activeStep: 'scheme' | 'code' | 'flow' = 'scheme'
     try {
       const chipSpec = getSpec(target) ?? undefined
-      const prompt = buildSchemePrompt(req, target, chipSpec)
-      const raw = await callAI(svc, [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user }
-      ], { temperature: 0.2 })
-      scheme = parseJSON<HardwareScheme>(raw)
-      if (!scheme) throw new Error('AI 返回格式解析失败，请重试')
+      const scheme = await runSchemegen(svc, req, target, chipSpec, { signal: controller.signal })
       setScheme(scheme)
-    } catch (e: any) {
-      setError(e.message)
-      setGenerating('scheme', false)
-      setPipelineStep('')
-      return
-    }
 
-    if (!autoPipeline) {
-      setGenerating('scheme', false)
-      setPipelineStep('')
-    }
-
-    // 一键流水线：方案完成后自动生成代码 → 流程图
-    if (autoPipeline && scheme) {
-      try {
+      if (autoPipeline) {
+        activeStep = 'code'
         setPipelineStep('code')
         setGenerating('code', true)
-        const currentProject = useProjectStore.getState().project!
-        const chipSpec = getSpec(target) ?? undefined
-        const codeResult = await runCodegen(svc, currentProject, chipSpec)
+        const currentProject = useProjectStore.getState().getCurrentProject()!
+        const codeResult = await runCodegen(svc, currentProject, chipSpec, { signal: controller.signal })
         useProjectStore.getState().setCodeFiles(codeResult.files)
         setGenerating('code', false)
+
+        activeStep = 'flow'
         setPipelineStep('flow')
         setGenerating('flow', true)
-        const flowResult = await runFlowgen(svc, codeResult.files)
+        const flowResult = await runFlowgen(svc, codeResult.files, { signal: controller.signal })
         useProjectStore.getState().setFlowData(flowResult.nodes, flowResult.edges)
         setGenerating('flow', false)
         navigate('/flow')
-      } catch (e: any) {
-        setError('流水线中断：' + e.message)
-      } finally {
-        setGenerating('scheme', false)
-        setGenerating('code', false)
-        setGenerating('flow', false)
-        setPipelineStep('')
       }
+    } catch (e: any) {
+      setError(activeStep === 'scheme' ? e.message : `流水线中断：${e.message}`)
+    } finally {
+      if (generationController.current === controller) generationController.current = null
+      setGenerating('scheme', false)
+      setGenerating('code', false)
+      setGenerating('flow', false)
+      setPipelineStep('')
     }
+  }
+
+  function handleCancelGeneration() {
+    generationController.current?.abort()
   }
 
   return (
@@ -280,12 +271,17 @@ export default function RequirementPage() {
 
           {/* 生成按钮 */}
           <button
-            onClick={handleGenerate}
-            disabled={isGeneratingScheme || !req.trim()}
-            className="ml-auto flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            onClick={isGeneratingScheme ? handleCancelGeneration : handleGenerate}
+            disabled={!isGeneratingScheme && !req.trim()}
+            className={cn(
+              'ml-auto flex items-center gap-2 px-5 py-2 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0',
+              isGeneratingScheme
+                ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20'
+                : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-indigo-500/20'
+            )}
           >
             {isGeneratingScheme
-              ? <><Loader2 size={15} className="animate-spin" /> {pipelineStep === 'code' ? '生成代码中...' : pipelineStep === 'flow' ? '生成流程图...' : 'AI 生成中...'}</>
+              ? <><Square size={14} /> 取消生成</>
               : <><Sparkles size={15} /> {autoPipeline ? '一键生成' : '生成方案'}</>
             }
           </button>

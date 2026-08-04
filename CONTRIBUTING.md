@@ -9,7 +9,7 @@ Thank you for helping improve MetaCore AI. Contributions should stay focused on 
 ### Development setup
 
 ```bash
-npm install
+npm ci
 npm run dev
 npm run dev:server
 ```
@@ -24,9 +24,10 @@ The frontend and localhost service run as separate processes. Do not commit API 
 4. Add or update smoke tests for localhost service behavior.
 5. Run the required checks before opening a pull request.
 
+New AI suppliers must implement the provider adapter contract instead of adding supplier-specific branches to route handlers. Do not add public provider credentials, shared API keys, billing configuration, or private partner endpoints to the repository.
+
 ```bash
-npm run test:local
-npm run build
+npm run check
 ```
 
 ### Pull requests
@@ -44,7 +45,7 @@ npm run build
 ### 开发环境
 
 ```bash
-npm install
+npm ci
 npm run dev
 npm run dev:server
 ```
@@ -59,9 +60,10 @@ npm run dev:server
 4. 修改本地服务行为时，添加或更新冒烟测试。
 5. 创建 Pull Request 前运行必要检查。
 
+新增 AI 供应商时，应实现服务商适配器契约，不要在路由处理中不断增加供应商专用分支。不得向仓库加入公共供应商凭据、共享 API Key、计费配置或私人合作接口。
+
 ```bash
-npm run test:local
-npm run build
+npm run check
 ```
 
 Pull Request 应说明用户可见变化和技术实现；UI 修改应附截图；新增配置、API、安全边界或迁移步骤应同步更新文档。

@@ -10,8 +10,8 @@
 
 [![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Node](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev/)
+[![Node](https://img.shields.io/badge/Node.js-20.19%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#版本状态)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#许可证)
 
@@ -61,6 +61,7 @@ MetaCore AI 将自然语言硬件需求转化为结构化的嵌入式开发流�
 | 安全文件操作 | 用户确认后写入、修改时间冲突检测、自动备份和恢复 |
 | 构建验证 | 检测并运行白名单内的 PlatformIO、ESP-IDF 和 CMake 构建 |
 | 项目导出 | 导出 ZIP 固件工程和格式化 PDF 设计文档 |
+| 项目迁移 | 导入、导出经过校验的 `.metacore.json` 项目归档，不包含 API Key |
 
 ## 系统架构
 
@@ -82,9 +83,9 @@ flowchart LR
 
 ## 版本状态
 
-当前版本：**v2.0.0**，发布日期为 `2026-07-16`。
+当前版本：**v2.1.0**，发布日期为 `2026-08-04`。
 
-2.0 版本新增 localhost 工程服务、本地项目诊断、五维健康评分、安全文件编辑与备份、报告导出、白名单构建验证和 AI 请求代理。早期 `v1.x` 版本主要聚焦浏览器端硬件设计和固件生成。
+2.1.0 将项目列表和当前项目合并为单一状态源，新增带版本和运行时校验的项目导入导出，并把本机服务拆分为配置、HTTP、安全和 AI 适配模块。供应商 API 只保留 `call` / `listModels` 扩展契约，当前没有公共云端 AI API、共享密钥或计费功能。2.0.1 重点增强 AI 请求取消、结构校验、真实路径安全、生产导出、按需加载、自动化测试和 GitHub Actions。
 
 > [!IMPORTANT]
 > MetaCore AI 生成的是工程建议和参考代码，不是经过认证的量产硬件。请始终根据真实芯片手册和目标开发板复核引脚、电气限制、依赖和固件行为。
@@ -105,7 +106,7 @@ VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、
 ## 环境要求
 
 - Windows、macOS 或 Linux
-- Node.js 18 或更高版本
+- Node.js 20.19 或更高版本
 - npm 9 或更高版本
 - 使用 AI 生成或 AI 诊断时，需要一个兼容的 AI 服务
 - 只有进行本地构建验证时，才需要 PlatformIO、ESP-IDF 或 CMake
@@ -117,7 +118,7 @@ VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、
 ```bash
 git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
 cd MetaCore-AI
-npm install
+npm ci
 ```
 
 分别启动本地服务和前端：
@@ -185,6 +186,8 @@ npm run dev
 
 当前实现将 API Key 保存到浏览器 `localStorage`。浏览器存储不属于 Git 工作区，不会被 `git add`、commit 或 push 上传。localhost 服务只把 Key 转发给用户配置的目标服务商，不会持久化 Key，也不会把 Key 写入操作日志。
 
+当前不提供公共云端 AI API。未来供应商接入应实现现有适配器的 `call` 和 `listModels` 契约，并在独立云端服务中处理登录、权限、限流和费用控制；不得把供应商密钥提交到本仓库。
+
 不要在共享浏览器配置中保存正式凭据。交接电脑前应清除网站数据，不要把真实 Key 放进源码、截图、Issue、日志或导出配置。
 
 ## 典型使用流程
@@ -211,9 +214,13 @@ npm run dev
 | --- | --- |
 | `npm run dev` | 启动 Vite 前端 |
 | `npm run dev:server` | 启动 localhost 本地工程和 AI 代理服务 |
+| `npm run lint` | 检查 TypeScript、React Hooks、浏览器和 Node.js 代码规范 |
+| `npm run typecheck` | 运行 TypeScript 严格类型检查 |
+| `npm run test` | 运行前端服务和 AI 数据校验单元测试 |
 | `npm run build` | 运行 TypeScript 检查并构建生产版本 |
 | `npm run preview` | 使用 Vite 预览生产构建 |
 | `npm run test:local` | 运行本地服务冒烟测试 |
+| `npm run check` | 依次运行代码规范、类型、单元测试、本地服务测试和构建 |
 
 ## 项目结构
 
@@ -221,16 +228,21 @@ npm run dev
 src/
 ├── components/          # React UI、页面、编辑器、图表和本地工作区组件
 ├── data/                # 芯片规格、代码模板和驱动模板
-├── services/            # AI、PDF、导出和本地服务客户端
-├── store/               # Zustand 状态存储
+├── services/            # AI、项目归档、PDF、导出和本地服务客户端
+├── store/               # Zustand 单一项目状态与其他浏览器状态
 ├── types/               # 硬件、项目和 AI 服务领域类型
 └── App.tsx              # HashRouter 路由
 server/
-├── index.mjs            # AI 代理、本地文件服务、分析、备份和构建
+├── index.mjs            # 本地服务组合入口、文件、分析、备份和构建
+├── config.mjs           # 监听地址、限制和版本元数据
+├── lib/http.mjs         # JSON、CORS、本机来源和请求体处理
+├── security/            # 工作区真实路径安全边界
+├── services/            # 可替换的 AI 服务商适配器
 └── smoke-test.mjs       # 独立本地 API 冒烟测试
 docs/
 ├── ARCHITECTURE.md      # 模块边界与依赖方向
-└── LOCAL_API.md         # 本地服务 API 文档
+├── LOCAL_API.md         # 本地服务 API 文档
+└── PROJECT_FILES.md     # 项目归档格式与安全限制
 examples/
 └── esp32-smart-environment/  # PlatformIO 分析示例
 public/
@@ -263,18 +275,19 @@ localhost 服务面向本地开发流程，不是通用远程文件服务器：
 - 备份写入所选工作区内的 `.metacore-backups`。
 - 构建验证可能生成 `.pio`、`build` 等正常工具输出。
 - 清除浏览器存储会删除浏览器内保存的项目和 AI 配置。
+- 清除浏览器存储前，可在`项目`页面导出 `.metacore.json` 归档；归档不包含 API Key。
 - 静态托管只能提供浏览器功能；本地工作区和 AI 代理仍需用户机器运行 `npm run dev:server`。
 - API Key 不得提交到仓库或写入示例工程。
 
 ## 测试
 
-运行本地服务冒烟测试：
+运行完整质量检查：
 
 ```bash
-npm run test:local
+npm run check
 ```
 
-测试会创建临时 PlatformIO 风格工程，并验证工作区设置、目录读取、ESP32 和物联网协议识别、依赖提取、文件写入与备份、报告生成、构建配置检测、AI Chat Completions、Responses API、模型列表和上游错误处理。
+单元测试会验证 AI 结果结构、项目单一状态、项目归档、流程图引用和生成文件路径安全；本地服务测试会创建临时 PlatformIO 风格工程，并验证工作区设置、目录读取、符号链接越界阻止、ESP32 和物联网协议识别、依赖提取、文件写入与备份、报告生成、构建配置检测、AI Chat Completions、Responses API、模型列表和上游错误处理。
 
 提交改动前运行生产构建：
 
@@ -337,7 +350,7 @@ npm run dev:server
 2. UI 改动应保持 React、TypeScript、Tailwind 和 Zustand 的现有风格。
 3. 本地文件系统操作必须保持在授权工作区安全边界内。
 4. 修改服务端行为时，应添加或更新本地冒烟测试。
-5. 提交 Pull Request 前运行 `npm run test:local` 和 `npm run build`。
+5. 提交 Pull Request 前运行 `npm run check`。
 
 ## GitHub 协作文件
 

@@ -1,4 +1,4 @@
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useThemeStore } from '@/store/themeStore'
 import { cn } from '@/lib/utils'
 import { FileCode, FileText, File, Folder } from 'lucide-react'
@@ -13,7 +13,8 @@ function getIcon(path: string, isDark: boolean) {
 }
 
 export default function FileTree() {
-  const { project, selectedFile, setSelectedFile } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
+  const { selectedFile, setSelectedFile } = useProjectStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
 

@@ -6,7 +6,6 @@ import {
   Code2,
   Cpu,
   Download,
-  FileText,
   FolderOpen,
   Gauge,
   History,

@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { useProjectsStore } from '@/store/projectsStore'
-import { useProjectStore } from '@/store/projectStore'
+import { useRef, useState } from 'react'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useThemeStore } from '@/store/themeStore'
 import type { Project } from '@/types/project'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
-import { Cpu, FolderOpen, Plus, Trash2, Clock, Sparkles } from 'lucide-react'
+import { Clock, Cpu, Download, FileUp, FolderOpen, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { parsePortableProject, portableProjectFilename, serializePortableProject } from '@/services/projects/portableProject'
 
 const CHIPS: ChipTarget[] = ['ESP32', 'ESP32-S3', 'STM32F103', 'STM32F4']
 const FORMATS: { value: ProjectFormat; label: string }[] = [
@@ -15,16 +15,18 @@ const FORMATS: { value: ProjectFormat; label: string }[] = [
 ]
 
 export default function ProjectManager() {
-  const { projects, deleteProject } = useProjectsStore()
-  const { loadProject, project: currentProject, createProject } = useProjectStore()
+  const currentProject = useProjectStore(selectCurrentProject)
+  const { projects, deleteProject, loadProject, createProject, importProject } = useProjectStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const [showNewForm, setShowNewForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newChip, setNewChip] = useState<ChipTarget>('ESP32')
   const [newFormat, setNewFormat] = useState<ProjectFormat>('espidf')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   function handleCreate() {
     if (!newName.trim()) return
@@ -35,19 +37,40 @@ export default function ProjectManager() {
 
   function handleDelete(id: string) {
     deleteProject(id)
-    if (currentProject?.id === id) {
-      useProjectStore.getState().reset()
-    }
     setConfirmDelete(null)
+  }
+
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const imported = importProject(parsePortableProject(await file.text()))
+      setNotice({ type: 'success', message: `已导入项目：${imported.name}` })
+    } catch (error) {
+      setNotice({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  function handleExport(project: Project) {
+    const blob = new Blob([serializePortableProject(project)], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = portableProjectFilename(project)
+    anchor.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    setNotice({ type: 'success', message: `已导出项目：${project.name}` })
   }
 
   const sortedProjects = [...projects].sort((a, b) => b.updatedAt - a.updatedAt)
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
         {/* 页头 */}
-        <div className="flex items-center justify-between mb-8 slide-in-left">
+        <div className="mb-8 flex flex-col gap-4 slide-in-left sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <div className={cn(
@@ -64,18 +87,51 @@ export default function ProjectManager() {
             <h1 className={cn('text-2xl font-bold mb-1', isDark ? 'text-white' : 'text-slate-800')}>项目管理</h1>
             <p className={cn('text-sm mt-1', isDark ? 'text-slate-400' : 'text-slate-500')}>创建和管理你的硬件方案项目</p>
           </div>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-all shadow-lg',
-              'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white hover:-translate-y-0.5 active:translate-y-0',
-              'shadow-cyan-500/20'
-            )}
-          >
-            <Plus size={16} />
-            新建项目
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,.metacore.json,application/json"
+              className="hidden"
+              onChange={handleImport}
+            />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors',
+                isDark
+                  ? 'border-slate-700 bg-slate-800/70 text-slate-200 hover:bg-slate-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              )}
+            >
+              <FileUp size={16} />
+              导入项目
+            </button>
+            <button
+              onClick={() => setShowNewForm(true)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-all shadow-lg',
+                'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white hover:-translate-y-0.5 active:translate-y-0',
+                'shadow-cyan-500/20'
+              )}
+            >
+              <Plus size={16} />
+              新建项目
+            </button>
+          </div>
         </div>
+
+        {notice && (
+          <div className={cn(
+            'mb-5 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm',
+            notice.type === 'success'
+              ? isDark ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : isDark ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700'
+          )}>
+            <span>{notice.message}</span>
+            <button onClick={() => setNotice(null)} className="text-xs opacity-70 hover:opacity-100">关闭</button>
+          </div>
+        )}
 
         {/* 新建表单 */}
         {showNewForm && (
@@ -195,6 +251,7 @@ export default function ProjectManager() {
                 project={proj}
                 isActive={currentProject?.id === proj.id}
                 onLoad={() => loadProject(proj.id)}
+                onExport={() => handleExport(proj)}
                 onDelete={() => setConfirmDelete(proj.id)}
               />
             ))}
@@ -235,10 +292,11 @@ export default function ProjectManager() {
   )
 }
 
-function ProjectCard({ project, isActive, onLoad, onDelete }: {
+function ProjectCard({ project, isActive, onLoad, onExport, onDelete }: {
   project: Project
   isActive: boolean
   onLoad: () => void
+  onExport: () => void
   onDelete: () => void
 }) {
   const { theme } = useThemeStore()
@@ -285,17 +343,34 @@ function ProjectCard({ project, isActive, onLoad, onDelete }: {
             <div className={cn('text-[10px] mt-0.5', isDark ? 'text-slate-500' : 'text-slate-400')}>{project.target} · {project.format}</div>
           </div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          className={cn(
-            'p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all',
-            isDark
-              ? 'text-slate-600 hover:text-red-400 hover:bg-red-950/30'
-              : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
-          )}
-        >
-          <Trash2 size={13} />
-        </button>
+        <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+          <button
+            type="button"
+            title="导出项目"
+            onClick={(event) => { event.stopPropagation(); onExport() }}
+            className={cn(
+              'p-1.5 rounded-lg transition-colors',
+              isDark
+                ? 'text-slate-500 hover:text-cyan-300 hover:bg-cyan-950/30'
+                : 'text-slate-400 hover:text-cyan-600 hover:bg-cyan-50'
+            )}
+          >
+            <Download size={13} />
+          </button>
+          <button
+            type="button"
+            title="删除项目"
+            onClick={(event) => { event.stopPropagation(); onDelete() }}
+            className={cn(
+              'p-1.5 rounded-lg transition-colors',
+              isDark
+                ? 'text-slate-600 hover:text-red-400 hover:bg-red-950/30'
+                : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
+            )}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 mb-3">

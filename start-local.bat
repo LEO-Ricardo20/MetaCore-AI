@@ -8,8 +8,14 @@ echo.
 
 node -v >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Node.js 18+
+    echo [错误] 未检测到 Node.js 20.19+
     echo 下载地址: https://nodejs.org/
+    pause
+    exit /b 1
+)
+node -e "const [major,minor]=process.versions.node.split('.').map(Number);process.exit(major^>20 ^|^| major===20 ^&^& minor^>=19?0:1)"
+if %errorlevel% neq 0 (
+    echo [错误] MetaCore AI 需要 Node.js 20.19 或更高版本
     pause
     exit /b 1
 )
@@ -20,7 +26,7 @@ echo.
 
 if not exist "node_modules" (
     echo 安装项目依赖...
-    call npm install
+    call npm ci
     if %errorlevel% neq 0 (
         echo [错误] 依赖安装失败
         pause

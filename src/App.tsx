@@ -1,17 +1,17 @@
-/** 应用路由配置 */
-
+import { lazy } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from '@/components/layout/MainLayout'
-import RequirementPage from '@/components/pages/RequirementPage'
-import CodegenPage from '@/components/pages/CodegenPage'
-import FlowPage from '@/components/pages/FlowPage'
-import SettingsPage from '@/components/pages/SettingsPage'
-import ProjectManager from '@/components/project/ProjectManager'
-import HelpPage from '@/components/pages/HelpPage'
-import AboutPage from '@/components/pages/AboutPage'
-import ChipManager from '@/components/chips/ChipManager'
-import DriversPage from '@/components/drivers/DriversPage'
-import LocalWorkspacePage from '@/components/local/LocalWorkspacePage'
+
+const RequirementPage = lazy(() => import('@/components/pages/RequirementPage'))
+const CodegenPage = lazy(() => import('@/components/pages/CodegenPage'))
+const FlowPage = lazy(() => import('@/components/pages/FlowPage'))
+const SettingsPage = lazy(() => import('@/components/pages/SettingsPage'))
+const ProjectManager = lazy(() => import('@/components/project/ProjectManager'))
+const HelpPage = lazy(() => import('@/components/pages/HelpPage'))
+const AboutPage = lazy(() => import('@/components/pages/AboutPage'))
+const ChipManager = lazy(() => import('@/components/chips/ChipManager'))
+const DriversPage = lazy(() => import('@/components/drivers/DriversPage'))
+const LocalWorkspacePage = lazy(() => import('@/components/local/LocalWorkspacePage'))
 
 export default function App() {
   return (

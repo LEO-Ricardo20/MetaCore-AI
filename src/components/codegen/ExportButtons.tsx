@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { useProjectStore } from '@/store/projectStore'
-import { exportZip } from '@/services/export/zipExport'
-import { exportPDF } from '@/services/export/pdfExport'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { Download, FileDown, Loader2 } from 'lucide-react'
 
 export default function ExportButtons() {
-  const { project } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
   const [zipping, setZipping] = useState(false)
   const [pdffing, setPdffing] = useState(false)
 
@@ -13,6 +11,7 @@ export default function ExportButtons() {
     if (!project) return
     setZipping(true)
     try {
+      const { exportZip } = await import('@/services/export/zipExport')
       await exportZip(project.name || 'metacore-project', project.codeFiles, project.target)
     } catch (e: any) {
       alert('导出失败: ' + e.message)
@@ -25,6 +24,7 @@ export default function ExportButtons() {
     if (!project) return
     setPdffing(true)
     try {
+      const { exportPDF } = await import('@/services/export/pdfExport')
       await exportPDF(project)
     } catch (e: any) {
       alert('导出失败: ' + e.message)

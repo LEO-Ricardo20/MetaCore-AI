@@ -1,6 +1,6 @@
 /** 自由配置模式 — 手动填写芯片参数 */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useThemeStore } from '@/store/themeStore'
 import { useChipStore } from '@/store/chipStore'
 import { cn } from '@/lib/utils'
@@ -48,11 +48,6 @@ export default function FormMode({ onDone, initialData }: Props) {
   const [step, setStep] = useState(1)
   const [spec, setSpec] = useState<ChipSpec>(initialData ?? emptySpec())
   const [saved, setSaved] = useState(false)
-
-  // 编辑模式时同步初始数据
-  useEffect(() => {
-    if (initialData) setSpec(initialData)
-  }, [initialData])
 
   const isEdit = !!initialData
 

@@ -6,16 +6,62 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-04
+
+### Added
+
+- Versioned `.metacore.json` project export and import from the project manager.
+- Runtime validation for imported project metadata, hardware schemes, generated paths, code size, and flow references.
+- Unit tests for portable project files, duplicate imports, canonical project updates, and active-project deletion.
+- Modular localhost-service configuration, HTTP/CORS, workspace-path security, and AI-provider transport files.
+- An AI provider adapter contract with `call` and `listModels` methods for future supplier integrations.
+
+### Changed
+
+- Replaced the duplicated `projectStore` and `projectsStore` state with one canonical persisted project store.
+- Kept generation state and selected files session-only while persisting project data and the active project ID.
+- Preserved the existing `metacore-projects` browser storage key so current project lists migrate without a destructive reset.
+- Reduced the responsibilities of `server/index.mjs` without changing the localhost API surface.
+
+### Security
+
+- Project imports reject unknown schemas, unsupported formats, unsafe generated paths, oversized archives, and invalid flow edges.
+- Project archives contain project design data only; AI service configuration and API keys are not exported.
+- No public cloud AI API, shared provider key, billing integration, or supplier-specific backend was added.
+
+## [2.0.1] - 2026-07-29
+
 ### Added
 
 - Unified MetaCore AI SVG, browser favicon, and Apple touch icon assets.
 - Reusable `MetaCoreLogo` component for consistent application branding.
 - GitHub issue forms, pull request template, contribution guide, security policy, code of conduct, and repository license file.
+- Runtime validation for AI-generated hardware schemes, code files, flow graphs, verification results, and chip specifications.
+- Request cancellation, total request timeouts, and limited retry handling for transient AI provider failures.
+- Vitest coverage for AI result validation and generated-file path safety.
+- ESLint, type-check, test, smoke-test, and production-build scripts with GitHub Actions CI.
 
 ### Changed
 
 - Reused the shared brand component in the sidebar and About page.
 - Expanded the Chinese and English README files with project branding and GitHub collaboration documentation.
+- Unified manual page generation and the one-click pipeline on shared AI workflow services.
+- Lazy-loaded route pages and heavy PDF, Monaco, flow, and export dependencies.
+- Upgraded the build toolchain to Vite 8 and raised the minimum Node.js version to 20.19.
+- Stopped tracking generated `dist` output in the source repository.
+
+### Fixed
+
+- Included the STM32 HAL template in production builds and made public asset URLs respect the Vite base path.
+- Rejected malformed AI output before it can enter Zustand stores or crash result components.
+- Rejected unsafe absolute, parent-relative, duplicate, or oversized AI-generated project files.
+- Corrected stale React Flow memoization and state synchronization dependencies.
+
+### Security
+
+- Canonicalized workspace paths with `realpath` checks before local file access.
+- Blocked workspace escape through symbolic links and Windows directory junctions.
+- Added a regression test that verifies linked external files cannot be listed or read.
 
 ## [2.0.0] - 2026-07-16
 

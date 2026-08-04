@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useAIConfigStore } from '@/store/aiConfigStore'
 import { useThemeStore } from '@/store/themeStore'
 import { callAI } from '@/services/ai/client'
 import { CHAT_SYSTEM_PROMPT } from '@/services/ai/prompts'
-import { X, Send, Loader2, Bot, User, Sparkles } from 'lucide-react'
+import { X, Send, Loader2, Bot, User, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Message {
@@ -13,7 +13,7 @@ interface Message {
 }
 
 export default function AIChatPanel({ onClose }: { onClose: () => void }) {
-  const { project } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
   const { getActive } = useAIConfigStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
@@ -24,10 +24,13 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const requestController = useRef<AbortController | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => () => requestController.current?.abort(), [])
 
   async function handleSend() {
     if (!input.trim() || loading) return
@@ -42,6 +45,9 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
     const pendingContent = input.trim()
     setInput('')
     setLoading(true)
+    const controller = new AbortController()
+    requestController.current?.abort()
+    requestController.current = controller
 
     const context = project
       ? `项目：${project.name}\n芯片：${project.target}\n格式：${project.format}\n方案：${project.scheme?.description ?? '未生成'}`
@@ -59,14 +65,14 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
           ...history,
           { role: 'user', content: pendingContent }
         ],
-        (chunk) => {
+        { signal: controller.signal, onChunk: (chunk) => {
           reply += chunk
           setMessages(m => {
             const updated = [...m]
             updated[updated.length - 1] = { role: 'assistant', content: reply }
             return updated
           })
-        }
+        } }
       )
     } catch (e: any) {
       setMessages(m => {
@@ -75,8 +81,18 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
         return updated
       })
     } finally {
+      if (requestController.current === controller) requestController.current = null
       setLoading(false)
     }
+  }
+
+  function handleCancel() {
+    requestController.current?.abort()
+  }
+
+  function handleClose() {
+    requestController.current?.abort()
+    onClose()
   }
 
   return (
@@ -104,7 +120,7 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className={cn(
             'p-1.5 rounded-lg transition-colors',
             isDark ? 'text-slate-500 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-indigo-50'
@@ -170,8 +186,8 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
             )}
           />
           <button
-            onClick={handleSend}
-            disabled={loading || !input.trim()}
+            onClick={loading ? handleCancel : handleSend}
+            disabled={!loading && !input.trim()}
             className={cn(
               'p-2 rounded-lg transition-all flex-shrink-0',
               input.trim() && !loading
@@ -179,7 +195,7 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
                 : isDark ? 'bg-slate-700 text-slate-500' : 'bg-indigo-100 text-indigo-300'
             )}
           >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            {loading ? <Square size={13} /> : <Send size={15} />}
           </button>
         </div>
         <p className={cn('text-[10px] text-center mt-1.5', isDark ? 'text-slate-600' : 'text-slate-400')}>

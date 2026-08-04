@@ -133,7 +133,7 @@ export default function ChipManager() {
             {mode === 'pdf' && <PdfParseMode onDone={closeMode} />}
             {mode === 'assisted' && <AssistedMode onDone={closeMode} />}
             {mode === 'form' && !editingChip && <FormMode onDone={closeMode} />}
-            {editingChip && <FormMode onDone={closeMode} initialData={editingChip} />}
+        {editingChip && <FormMode key={editingChip.name} onDone={closeMode} initialData={editingChip} />}
           </div>
         )}
 

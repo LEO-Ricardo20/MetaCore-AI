@@ -14,8 +14,8 @@ Documentation language: English with Chinese UI names where they match the appli
 
 [![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Node](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev/)
+[![Node](https://img.shields.io/badge/Node.js-20.19%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#release-status)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#license)
 
@@ -63,6 +63,7 @@ The browser application handles the product interface and AI workflows. An optio
 | Safe operations | User-confirmed file editing, modification-time conflict detection, automatic backups, and restore |
 | Build verification | Detect and run allowlisted PlatformIO, ESP-IDF, and CMake builds |
 | Export | ZIP firmware project packages and formatted PDF design documents |
+| Project portability | Validated `.metacore.json` import and export without API keys |
 
 ## Architecture
 
@@ -83,9 +84,9 @@ The localhost service provides the local AI proxy and the `本地` workspace bou
 
 ## Release Status
 
-Current release: **v2.0.0** (`2026-07-16`)
+Current release: **v2.1.0** (`2026-08-04`)
 
-Version 2 introduces the optional localhost engineering service, local project diagnosis, five-dimensional health scoring, safe file editing with backups, report export, and allowlisted build verification. Earlier `v1.x` releases focused on browser-side hardware design and firmware generation.
+Version 2.1.0 replaces duplicated project state with one canonical store, adds validated versioned project import/export, and separates localhost configuration, HTTP, path security, and provider transport modules. Supplier integration remains an adapter contract only; this release does not add a public cloud AI API, shared provider key, billing, or quotas. Version 2.0.1 added AI cancellation, runtime validation, canonical workspace security, code splitting, automated tests, and GitHub Actions.
 
 > [!IMPORTANT]
 > MetaCore AI generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
@@ -106,7 +107,7 @@ VPS.Town is a platform focused on VPS and cloud server services, providing stabl
 ## Requirements
 
 - Windows, macOS, or Linux
-- Node.js 18 or newer
+- Node.js 20.19 or newer
 - npm 9 or newer
 - A compatible AI provider, if you want AI generation or AI diagnosis
 - PlatformIO, ESP-IDF, or CMake only when you want local build verification
@@ -118,7 +119,7 @@ VPS.Town is a platform focused on VPS and cloud server services, providing stabl
 ```bash
 git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
 cd MetaCore-AI
-npm install
+npm ci
 npm run dev
 ```
 
@@ -172,6 +173,8 @@ Custom endpoints can use either the Responses API or Chat Completions. CCH-compa
 
 AI keys are stored in the browser's `localStorage` by the current implementation. Browser storage is outside the Git working tree and is not included by `git add`, commit, or push. When the localhost service is running, AI requests use the local proxy; the service forwards the key only to the configured provider and does not persist it or write it to operation logs. If the proxy is unavailable, the client may fall back to a browser-direct request when the provider permits CORS.
 
+MetaCore AI does not currently provide a public cloud AI API. Future supplier integrations should implement the existing `call` and `listModels` adapter contract in a separately secured service with authentication, rate limits, and cost controls. Supplier secrets must never be committed to this repository.
+
 Do not use a shared browser profile for production credentials. Clear the site's browser data before handing the computer to another user, never place real keys in source files, screenshots, issues, or exported configuration, and review the provider's privacy policy before sending source code or datasheets for analysis.
 
 ## Typical Workflow
@@ -198,9 +201,13 @@ It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, depend
 | --- | --- |
 | `npm run dev` | Start the Vite frontend |
 | `npm run dev:server` | Start the localhost engineering service |
+| `npm run lint` | Check TypeScript, React Hooks, browser, and Node.js source conventions |
+| `npm run typecheck` | Run strict TypeScript checks |
+| `npm run test` | Run AI result and frontend-service unit tests |
 | `npm run build` | Type-check and create a production frontend build |
 | `npm run preview` | Preview the production build with Vite |
 | `npm run test:local` | Run the local service smoke test |
+| `npm run check` | Run lint, type checks, unit tests, local smoke tests, and the production build |
 
 ## Project Structure
 
@@ -208,16 +215,21 @@ It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, depend
 src/
 ├── components/          # React UI, pages, editors, diagrams, and local workspace panels
 ├── data/                # Chip specifications, code templates, and driver templates
-├── services/            # AI, PDF, export, and local-service clients
-├── store/               # Zustand application stores
+├── services/            # AI, project archives, PDF, export, and local-service clients
+├── store/               # Canonical project state and other browser stores
 ├── types/               # Domain types for hardware, projects, and AI services
 └── App.tsx              # HashRouter routes
 server/
-├── index.mjs            # Local filesystem service, analyzer, backups, and builds
+├── index.mjs            # Local-service composition, files, analysis, backups, and builds
+├── config.mjs           # Bind address, limits, and package metadata
+├── lib/http.mjs         # JSON, CORS, origin, and request-body handling
+├── security/            # Canonical workspace-path boundary
+├── services/            # Replaceable AI provider adapter
 └── smoke-test.mjs       # Self-contained local API smoke test
 docs/
 ├── ARCHITECTURE.md      # Module boundaries and dependency direction
-└── LOCAL_API.md         # Local service API reference
+├── LOCAL_API.md         # Local service API reference
+└── PROJECT_FILES.md     # Portable project format and safety limits
 examples/
 └── esp32-smart-environment/  # PlatformIO analysis example
 public/
@@ -249,18 +261,19 @@ The local service is designed for a local development workflow, not as a general
 - Backups are written to `.metacore-backups` inside the selected workspace.
 - Build verification can create normal tool output such as `.pio`, `build`, or generated artifacts.
 - Clearing browser storage removes saved projects and AI configuration from the browser.
+- Export `.metacore.json` archives from the project manager before clearing browser storage. Archives do not contain API keys.
 - Static hosting only provides browser features; the local workspace page still requires `npm run dev:server` on the user's machine.
 - API keys must not be committed to this repository or placed in the example project.
 
 ## Testing
 
-Run the local service smoke test:
+Run the complete quality gate:
 
 ```bash
-npm run test:local
+npm run check
 ```
 
-The test creates a temporary PlatformIO-like project and verifies workspace setup, directory listing, ESP32 and IoT protocol detection, dependency extraction, file writing with backup, report generation, build profile detection, AI proxy calls, model discovery, Responses API handling, and upstream error propagation.
+Unit tests validate AI result structures, canonical project state, portable project archives, flow references, and generated-file path safety. The local service test creates a temporary PlatformIO-like project and verifies workspace setup, directory listing, linked-path escape protection, ESP32 and IoT protocol detection, dependency extraction, file writing with backup, report generation, build profile detection, AI proxy calls, model discovery, Responses API handling, and upstream error propagation.
 
 Run the production build before submitting changes:
 
@@ -319,7 +332,7 @@ The project marker may exist, but the corresponding tool is not available in `PA
 2. Keep UI changes consistent with the existing React, TypeScript, Tailwind, and Zustand patterns.
 3. Keep local filesystem operations inside the workspace security boundary.
 4. Add or update the local smoke test when changing server behavior.
-5. Run `npm run test:local` and `npm run build` before opening a pull request.
+5. Run `npm run check` before opening a pull request.
 
 ## GitHub Collaboration Files
 

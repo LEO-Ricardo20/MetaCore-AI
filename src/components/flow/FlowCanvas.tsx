@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -15,11 +15,13 @@ import ReactFlow, {
   Panel,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useThemeStore } from '@/store/themeStore'
 import type { FlowNode } from '@/types/project'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronUp, FileCode, GitBranch } from 'lucide-react'
+import { FileCode, GitBranch } from 'lucide-react'
+
+const EDGE_STYLE = { stroke: '#6366f1', strokeWidth: 2.5 }
 
 const NODE_CATEGORIES: Record<string, { bg: string; border: string; text: string; label: string; icon: string; badge: string }> = {
   init: { bg: 'bg-indigo-500/20', border: 'border-indigo-500/40', text: 'text-indigo-300', label: '初始化', icon: '⚡', badge: 'bg-indigo-500/30' },
@@ -132,33 +134,33 @@ function CodeNodeComponent({ data, selected }: NodeProps<FlowNode & { category?:
 const nodeTypes: NodeTypes = { custom: CodeNodeComponent }
 
 export default function FlowCanvas() {
-  const { project } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
 
-  const edgeColor = '#6366f1'
-  const edgeStyle = { stroke: edgeColor, strokeWidth: 2.5 }
+  const flowNodes = project?.flowNodes
+  const flowEdges = project?.flowEdges
 
   const initialNodes: Node[] = useMemo(() => {
-    if (!project) return []
-    return project.flowNodes.map(n => ({
+    if (!flowNodes) return []
+    return flowNodes.map(n => ({
       id: n.id,
       type: 'custom',
       position: n.position,
       draggable: true,
       data: { ...n, category: detectCategory(n.label, n.nodeStyle) }
     }))
-  }, [project?.flowNodes])
+  }, [flowNodes])
 
   const initialEdges: Edge[] = useMemo(() => {
-    if (!project) return []
-    return project.flowEdges.map(e => ({
+    if (!flowEdges) return []
+    return flowEdges.map(e => ({
       id: e.id,
       source: e.source,
       target: e.target,
       label: e.label,
       animated: true,
-      style: edgeStyle,
+      style: EDGE_STYLE,
       labelStyle: {
         fill: isDark ? '#94a3b8' : '#64748b',
         fontSize: 11,
@@ -172,13 +174,13 @@ export default function FlowCanvas() {
       labelBgPadding: [6, 10] as [number, number],
       labelBgBorderRadius: 8,
     }))
-  }, [project?.flowEdges, isDark])
+  }, [flowEdges, isDark])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [edges, setEdges] = useEdgesState(initialEdges)
 
-  useEffect(() => { setNodes(initialNodes) }, [initialNodes])
-  useEffect(() => { setEdges(initialEdges) }, [initialEdges])
+  useEffect(() => { setNodes(initialNodes) }, [initialNodes, setNodes])
+  useEffect(() => { setEdges(initialEdges) }, [initialEdges, setEdges])
 
   if (!project) return null
 

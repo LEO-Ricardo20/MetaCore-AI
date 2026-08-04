@@ -3,6 +3,9 @@
 import { resolveAIAPIMode, type AIServiceConfig } from '@/types/ai'
 
 const LOCAL_AI_API = 'http://127.0.0.1:3766/api/ai'
+const LOCAL_PROXY_TIMEOUT_MS = 95_000
+const DIRECT_REQUEST_TIMEOUT_MS = 90_000
+const MODEL_LIST_TIMEOUT_MS = 35_000
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -12,6 +15,9 @@ export interface ChatMessage {
 export interface CallAIOptions {
   temperature?: number
   onChunk?: (text: string) => void
+  signal?: AbortSignal
+  timeoutMs?: number
+  retries?: number
 }
 
 export interface AIConnectionResult {
@@ -21,6 +27,20 @@ export interface AIConnectionResult {
 }
 
 class LocalProxyUnavailableError extends Error {}
+
+class AIRequestError extends Error {
+  constructor(message: string, readonly status?: number, readonly retryable = false) {
+    super(message)
+    this.name = 'AIRequestError'
+  }
+}
+
+export class AIRequestCancelledError extends Error {
+  constructor() {
+    super('AI 请求已取消')
+    this.name = 'AIRequestCancelledError'
+  }
+}
 
 function normalizeBaseURL(value: string) {
   return value.trim().replace(/\/+$/, '')
@@ -38,12 +58,61 @@ function providerError(raw: string, status: number) {
 function requestError(raw: string, status: number, prefix = 'AI 请求失败') {
   const message = providerError(raw, status)
   if (status === 429 || /\b429\b|rate limit|rate limiting|too busy/i.test(message)) {
-    return new Error(`AI 服务商当前限流或系统繁忙（429）。请稍后重试，检查配额/QPS，或更换模型。原始提示：${message}`)
+    return new AIRequestError(`AI 服务商当前限流或系统繁忙（429）。请稍后重试，检查配额/QPS，或更换模型。原始提示：${message}`, status, true)
   }
   if (status === 503 && /no available providers/i.test(message)) {
-    return new Error(`中转平台当前没有可用的上游通道（503）。请读取并更换模型，或在中转平台检查渠道状态。原始提示：${message}`)
+    return new AIRequestError(`中转平台当前没有可用的上游通道（503）。请读取并更换模型，或在中转平台检查渠道状态。原始提示：${message}`, status, true)
   }
-  return new Error(`${prefix} (${status})：${message}`)
+  return new AIRequestError(`${prefix} (${status})：${message}`, status, [502, 503, 504].includes(status))
+}
+
+async function withRequestTimeout<T>(
+  timeoutMs: number,
+  externalSignal: AbortSignal | undefined,
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  if (externalSignal?.aborted) throw new AIRequestCancelledError()
+  const controller = new AbortController()
+  let timedOut = false
+  const abortFromCaller = () => controller.abort()
+  externalSignal?.addEventListener('abort', abortFromCaller, { once: true })
+  const timer = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+
+  try {
+    return await operation(controller.signal)
+  } catch (error) {
+    if (externalSignal?.aborted) throw new AIRequestCancelledError()
+    if (timedOut || controller.signal.aborted) {
+      throw new AIRequestError(`AI 请求超时（${Math.round(timeoutMs / 1_000)} 秒）`, 504, true)
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timer)
+    externalSignal?.removeEventListener('abort', abortFromCaller)
+  }
+}
+
+async function retryDelay(attempt: number, signal?: AbortSignal) {
+  const delayMs = Math.min(2_000, 500 * (2 ** attempt))
+  await new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new AIRequestCancelledError())
+      return
+    }
+    const onAbort = () => {
+      window.clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      reject(new AIRequestCancelledError())
+    }
+    const timer = window.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, delayMs)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 function authHeaders(service: AIServiceConfig) {
@@ -58,55 +127,62 @@ async function callThroughLocalProxy(
   messages: ChatMessage[],
   opts: CallAIOptions,
 ) {
-  let response: Response
   try {
-    response = await fetch(`${LOCAL_AI_API}/call`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service,
-        messages,
-        temperature: opts.temperature ?? 0.3,
-      }),
+    return await withRequestTimeout(opts.timeoutMs ?? LOCAL_PROXY_TIMEOUT_MS, opts.signal, async (signal) => {
+      const response = await fetch(`${LOCAL_AI_API}/call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service,
+          messages,
+          temperature: opts.temperature ?? 0.3,
+        }),
+        signal,
+      })
+
+      const raw = await response.text()
+      if (response.status === 404) throw new LocalProxyUnavailableError('本地 AI 代理版本过旧')
+      if (!response.ok) throw requestError(raw, response.status, 'AI 服务请求失败')
+
+      const data = JSON.parse(raw)
+      if (typeof data.content !== 'string' || !data.content) {
+        throw new AIRequestError('本地 AI 代理没有返回文本内容', 502)
+      }
+      opts.onChunk?.(data.content)
+      return data.content as string
     })
-  } catch {
+  } catch (error) {
+    if (error instanceof AIRequestError || error instanceof AIRequestCancelledError || error instanceof LocalProxyUnavailableError) throw error
+    if (!(error instanceof TypeError)) throw error
     throw new LocalProxyUnavailableError('本地 AI 代理未启动')
   }
-
-  const raw = await response.text()
-  if (response.status === 404) throw new LocalProxyUnavailableError('本地 AI 代理版本过旧')
-  if (!response.ok) {
-    throw requestError(raw, response.status, 'AI 服务请求失败')
-  }
-
-  const data = JSON.parse(raw)
-  if (typeof data.content !== 'string' || !data.content) {
-    throw new Error('本地 AI 代理没有返回文本内容')
-  }
-  opts.onChunk?.(data.content)
-  return data.content as string
 }
 
 export async function fetchAIModels(service: AIServiceConfig): Promise<string[]> {
-  let response: Response
   try {
-    response = await fetch(`${LOCAL_AI_API}/models`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service }),
+    return await withRequestTimeout(MODEL_LIST_TIMEOUT_MS, undefined, async (signal) => {
+      const response = await fetch(`${LOCAL_AI_API}/models`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service }),
+        signal,
+      })
+      const raw = await response.text()
+      if (!response.ok) throw requestError(raw, response.status, '读取模型列表失败')
+
+      const data = JSON.parse(raw)
+      if (!Array.isArray(data.models) || !data.models.length) {
+        throw new AIRequestError('服务商没有返回可用模型', 502)
+      }
+      return data.models.filter((model: unknown): model is string => typeof model === 'string')
     })
-  } catch {
-    throw new Error('本地 AI 代理未启动，无法读取服务商模型列表。请先运行 npm run dev:server。')
+  } catch (error) {
+    if (error instanceof AIRequestError) throw error
+    if (error instanceof TypeError) {
+      throw new Error('本地 AI 代理未启动，无法读取服务商模型列表。请先运行 npm run dev:server。', { cause: error })
+    }
+    throw error
   }
-
-  const raw = await response.text()
-  if (!response.ok) throw requestError(raw, response.status, '读取模型列表失败')
-
-  const data = JSON.parse(raw)
-  if (!Array.isArray(data.models) || !data.models.length) {
-    throw new Error('服务商没有返回可用模型')
-  }
-  return data.models.filter((model: unknown): model is string => typeof model === 'string')
 }
 
 async function callDirect(
@@ -136,7 +212,7 @@ async function invokeAI(
     return { content, via: 'direct' }
   } catch (error: any) {
     if (error instanceof TypeError || error?.message === 'Failed to fetch') {
-      throw new Error('浏览器直连 AI 服务失败。请启动 npm run dev:server 使用本地代理，或检查服务商是否允许浏览器跨域访问。')
+      throw new AIRequestError('浏览器直连 AI 服务失败。请启动 npm run dev:server 使用本地代理，或检查服务商是否允许浏览器跨域访问。', 502, true)
     }
     throw error
   }
@@ -148,8 +224,16 @@ export async function callAI(
   options?: CallAIOptions | ((text: string) => void),
 ): Promise<string> {
   const opts: CallAIOptions = typeof options === 'function' ? { onChunk: options } : (options ?? {})
-  const result = await invokeAI(service, messages, opts)
-  return result.content
+  const retries = opts.onChunk ? 0 : Math.max(0, Math.min(2, opts.retries ?? 1))
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const result = await invokeAI(service, messages, opts)
+      return result.content
+    } catch (error) {
+      if (!(error instanceof AIRequestError) || !error.retryable || attempt >= retries) throw error
+      await retryDelay(attempt, opts.signal)
+    }
+  }
 }
 
 async function callAIChatCompletionsDirect(
@@ -157,59 +241,34 @@ async function callAIChatCompletionsDirect(
   messages: ChatMessage[],
   opts: CallAIOptions,
 ): Promise<string> {
-  const onChunk = opts.onChunk
-  const response = await fetch(`${normalizeBaseURL(service.baseURL)}/chat/completions`, {
-    method: 'POST',
-    headers: authHeaders(service),
-    body: JSON.stringify({
-      model: service.model,
-      messages,
-      stream: Boolean(onChunk),
-      temperature: opts.temperature ?? 0.3,
-    }),
-  })
+  return withRequestTimeout(opts.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
+    const onChunk = opts.onChunk
+    const response = await fetch(`${normalizeBaseURL(service.baseURL)}/chat/completions`, {
+      method: 'POST',
+      headers: authHeaders(service),
+      body: JSON.stringify({
+        model: service.model,
+        messages,
+        stream: Boolean(onChunk),
+        temperature: opts.temperature ?? 0.3,
+      }),
+      signal,
+    })
 
-  if (!response.ok) {
-    const raw = await response.text()
-    throw requestError(raw, response.status)
-  }
-
-  if (!onChunk) {
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
-    if (typeof content !== 'string') throw new Error('AI 服务没有返回文本内容')
-    return content
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('AI 服务没有返回可读取的数据流')
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let full = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue
-      const raw = line.slice(6).trim()
-      if (!raw || raw === '[DONE]') continue
-      try {
-        const data = JSON.parse(raw)
-        const text = data.choices?.[0]?.delta?.content ?? ''
-        if (text) {
-          full += text
-          onChunk(text)
-        }
-      } catch {
-        // Ignore malformed event fragments from third-party compatible services.
-      }
+    if (!response.ok) {
+      const raw = await response.text()
+      throw requestError(raw, response.status)
     }
-  }
-  return full
+
+    if (!onChunk) {
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content
+      if (typeof content !== 'string' || !content) throw new AIRequestError('AI 服务没有返回文本内容', 502)
+      return content
+    }
+
+    return readSSEText(response, onChunk, (data) => data.choices?.[0]?.delta?.content)
+  })
 }
 
 async function callAIResponsesDirect(
@@ -217,63 +276,82 @@ async function callAIResponsesDirect(
   messages: ChatMessage[],
   opts: CallAIOptions,
 ): Promise<string> {
-  const onChunk = opts.onChunk
-  const systemMessage = messages.find((message) => message.role === 'system')
-  const inputMessages = messages.filter((message) => message.role !== 'system')
-  const body: Record<string, unknown> = {
-    model: service.model,
-    input: inputMessages.length === 1 && inputMessages[0].role === 'user'
-      ? inputMessages[0].content
-      : inputMessages,
-    stream: Boolean(onChunk),
-  }
-  if (systemMessage) body.instructions = systemMessage.content
+  return withRequestTimeout(opts.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
+    const onChunk = opts.onChunk
+    const systemMessage = messages.find((message) => message.role === 'system')
+    const inputMessages = messages.filter((message) => message.role !== 'system')
+    const body: Record<string, unknown> = {
+      model: service.model,
+      input: inputMessages.length === 1 && inputMessages[0].role === 'user'
+        ? inputMessages[0].content
+        : inputMessages,
+      stream: Boolean(onChunk),
+    }
+    if (systemMessage) body.instructions = systemMessage.content
 
-  const response = await fetch(`${normalizeBaseURL(service.baseURL)}/responses`, {
-    method: 'POST',
-    headers: authHeaders(service),
-    body: JSON.stringify(body),
+    const response = await fetch(`${normalizeBaseURL(service.baseURL)}/responses`, {
+      method: 'POST',
+      headers: authHeaders(service),
+      body: JSON.stringify(body),
+      signal,
+    })
+
+    if (!response.ok) {
+      const raw = await response.text()
+      throw requestError(raw, response.status)
+    }
+
+    if (!onChunk) {
+      const data = await response.json()
+      const content = extractResponsesText(data)
+      if (!content) throw new AIRequestError('OpenAI Responses API 没有返回文本内容', 502)
+      return content
+    }
+
+    return readSSEText(response, onChunk, (data) => (
+      data.type === 'response.output_text.delta' ? data.delta : ''
+    ))
   })
+}
 
-  if (!response.ok) {
-    const raw = await response.text()
-    throw requestError(raw, response.status)
-  }
-
-  if (!onChunk) {
-    const data = await response.json()
-    const content = extractResponsesText(data)
-    if (!content) throw new Error('OpenAI Responses API 没有返回文本内容')
-    return content
-  }
-
+async function readSSEText(
+  response: Response,
+  onChunk: (text: string) => void,
+  extractDelta: (data: any) => unknown,
+) {
   const reader = response.body?.getReader()
-  if (!reader) throw new Error('OpenAI 没有返回可读取的数据流')
+  if (!reader) throw new AIRequestError('AI 服务没有返回可读取的数据流', 502)
   const decoder = new TextDecoder()
   let buffer = ''
   let full = ''
+
+  const processLine = (line: string) => {
+    const normalized = line.trimEnd()
+    if (!normalized.startsWith('data:')) return
+    const raw = normalized.slice(5).trim()
+    if (!raw || raw === '[DONE]') return
+    try {
+      const delta = extractDelta(JSON.parse(raw))
+      if (typeof delta === 'string' && delta) {
+        full += delta
+        onChunk(delta)
+      }
+    } catch {
+      // Compatible providers occasionally emit non-JSON keepalive events.
+    }
+  }
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
     buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
+    const lines = buffer.split(/\r?\n/)
     buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue
-      const raw = line.slice(6).trim()
-      if (!raw || raw === '[DONE]') continue
-      try {
-        const data = JSON.parse(raw)
-        if (data.type === 'response.output_text.delta' && data.delta) {
-          full += data.delta
-          onChunk(data.delta)
-        }
-      } catch {
-        // Ignore malformed event fragments.
-      }
-    }
+    lines.forEach(processLine)
   }
+  buffer += decoder.decode()
+  if (buffer) buffer.split(/\r?\n/).forEach(processLine)
+  if (!full) throw new AIRequestError('AI 数据流结束，但没有返回文本内容', 502)
   return full
 }
 

@@ -180,7 +180,9 @@ export default function LocalWorkspacePage() {
   }
 
   useEffect(() => {
-    boot()
+    void boot()
+    // This startup probe intentionally runs once for the localhost service.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSetWorkspace() {

@@ -29,5 +29,6 @@ npm-debug.log*
 
 # Misc
 *.local
+.claude/settings.local.json
 server/.metacore-local.json
 .cache/

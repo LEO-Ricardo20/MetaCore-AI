@@ -1,5 +1,5 @@
 import Editor from '@monaco-editor/react'
-import { useProjectStore } from '@/store/projectStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useThemeStore } from '@/store/themeStore'
 import { cn } from '@/lib/utils'
 
@@ -9,7 +9,8 @@ const LANG_MAP: Record<string, string> = {
 }
 
 export default function CodePreview() {
-  const { project, selectedFile } = useProjectStore()
+  const project = useProjectStore(selectCurrentProject)
+  const selectedFile = useProjectStore((state) => state.selectedFile)
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
   const file = project?.codeFiles.find(f => f.path === selectedFile)
