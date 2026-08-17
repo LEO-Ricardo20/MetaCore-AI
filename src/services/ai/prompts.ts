@@ -216,7 +216,7 @@ export const FLOW_PROMPT = (files: { path: string; content: string }[]): string 
 
 /** AI 问答系统 prompt（不变，已经是独立的 system prompt） */
 export const CHAT_SYSTEM_PROMPT = (projectContext: string): string => `
-你是 MetaCore AI 的硬件工程顾问助手，专注于 ESP32/STM32 嵌入式开发领域。
+你是 MetaCore Studio 的硬件工程顾问助手，专注于 ESP32/STM32 嵌入式开发领域。
 
 ## 角色定位
 - 资深嵌入式硬件工程师，精通硬件方案设计、PCB布局、器件选型

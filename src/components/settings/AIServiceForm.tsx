@@ -243,7 +243,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
           <Field label="模型" isDark={isDark}>
             <div className="flex items-stretch gap-2">
               <input
-                list="metacore-ai-model-options"
+                list="metacore-studio-model-options"
                 value={form.model}
                 onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))}
                 placeholder="模型标识"
@@ -262,7 +262,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
                 {loadingModels ? '读取中' : '读取模型'}
               </button>
             </div>
-            <datalist id="metacore-ai-model-options">
+            <datalist id="metacore-studio-model-options">
               {modelOptions.map((model) => <option key={model} value={model} />)}
             </datalist>
             {modelStatus && <Hint isDark={isDark}>{modelStatus}</Hint>}

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible MetaCore AI problem
+description: Report a reproducible MetaCore Studio problem
 title: "[Bug]: "
 labels:
   - bug

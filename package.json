@@ -1,6 +1,6 @@
 {
-  "name": "metacore-ai",
-  "version": "2.1.0",
+  "name": "metacore-studio",
+  "version": "2.2.0",
   "description": "AI-assisted hardware architecture, firmware generation, and local embedded project analysis for ESP32 and STM32",
   "private": true,
   "type": "module",

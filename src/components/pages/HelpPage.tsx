@@ -78,6 +78,16 @@ const CHANGELOG = [
     date: APP_RELEASE_DATE,
     badge: 'emerald',
     changes: [
+      '品牌：产品由 MetaCore AI 正式更名为 MetaCore Studio',
+      '同步：更新应用界面、npm 包名、GitHub 仓库链接、文档、报告、提示词和启动脚本',
+      '兼容：保留原有浏览器存储键、.metacore.json 项目归档、本地备份目录和 API 路径',
+    ],
+  },
+  {
+    version: 'v2.1.0',
+    date: '2026-08-04',
+    badge: 'cyan',
+    changes: [
       '新增：项目可导出和导入带版本的 .metacore.json 归档，便于跨浏览器和电脑迁移',
       '安全：导入前校验工程格式、代码路径、文件体积和流程图引用，项目归档不包含 API Key',
       '重构：项目列表和当前项目合并为单一 Zustand 状态源，避免跨 Store 同步偏差',
@@ -89,7 +99,7 @@ const CHANGELOG = [
   {
     version: 'v1.5.6',
     date: '2026-03-25',
-    badge: 'cyan',
+    badge: 'indigo',
     changes: [
       '修复：手动预选驱动在点击「生成方案」后丢失的 bug（createProject 现在保留 selectedDriverIds）',
       '新增：一键式生成开关 — 开启后点「生成方案」自动串行完成 方案→代码→流程图 三步无需逐步手动点击，开关状态跨会话记忆',
@@ -252,7 +262,7 @@ export default function HelpPage() {
             <span className="text-xs text-cyan-400 font-medium tracking-wide uppercase">Documentation</span>
           </div>
           <h1 className={cn('text-2xl font-bold mb-1', isDark ? 'text-white' : 'text-slate-800')}>使用教程 & 更新日志</h1>
-          <p className={cn('text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>快速上手 MetaCore AI，了解所有功能和使用方法</p>
+          <p className={cn('text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>快速上手 MetaCore Studio，了解所有功能和使用方法</p>
         </div>
 
         <div className="flex gap-6">

@@ -1,6 +1,6 @@
 # Code of Conduct
 
-MetaCore AI welcomes technical discussion and contributions from people with different backgrounds and experience levels.
+MetaCore Studio welcomes technical discussion and contributions from people with different backgrounds and experience levels.
 
 Participants are expected to:
 

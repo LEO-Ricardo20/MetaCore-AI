@@ -1,9 +1,9 @@
-# MetaCore AI
+# MetaCore Studio
 
 [简体中文](./README.md) | [English](./README_EN.md)
 
 <p align="center">
-  <img src="./public/logo.svg" alt="MetaCore AI logo" width="96" />
+  <img src="./public/logo.svg" alt="MetaCore Studio logo" width="96" />
 </p>
 
 > 面向 ESP32、STM32 与自定义芯片的 AI 硬件架构、固件生成和本地嵌入式工程分析平台。
@@ -12,10 +12,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev/)
 [![Node](https://img.shields.io/badge/Node.js-20.19%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#版本状态)
+[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-Studio?label=version&color=16a34a)](#版本状态)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#许可证)
 
-MetaCore AI 将自然语言硬件需求转化为结构化的嵌入式开发流程：
+MetaCore Studio 将自然语言硬件需求转化为结构化的嵌入式开发流程：
 
 ```text
 需求描述 -> 硬件方案 -> 引脚/BOM/接线 -> 固件代码 -> 流程图 -> 本地诊断 -> 导出
@@ -83,19 +83,19 @@ flowchart LR
 
 ## 版本状态
 
-当前版本：**v2.1.0**，发布日期为 `2026-08-04`。
+当前版本：**v2.2.0**，发布日期为 `2026-08-17`。
 
-2.1.0 将项目列表和当前项目合并为单一状态源，新增带版本和运行时校验的项目导入导出，并把本机服务拆分为配置、HTTP、安全和 AI 适配模块。供应商 API 只保留 `call` / `listModels` 扩展契约，当前没有公共云端 AI API、共享密钥或计费功能。2.0.1 重点增强 AI 请求取消、结构校验、真实路径安全、生产导出、按需加载、自动化测试和 GitHub Actions。
+2.2.0 将产品由 **MetaCore AI** 更名为 **MetaCore Studio**，同步更新应用界面、npm 包名、GitHub 仓库地址、文档、启动脚本、导出报告和示例内容。为保证无损升级，现有浏览器存储键、`.metacore.json` 项目归档、`.metacore-backups` 备份目录和 localhost API 路径保持兼容。
 
 > [!IMPORTANT]
-> MetaCore AI 生成的是工程建议和参考代码，不是经过认证的量产硬件。请始终根据真实芯片手册和目标开发板复核引脚、电气限制、依赖和固件行为。
+> MetaCore Studio 生成的是工程建议和参考代码，不是经过认证的量产硬件。请始终根据真实芯片手册和目标开发板复核引脚、电气限制、依赖和固件行为。
 
 > [!CAUTION]
 > 本地工作区可能包含源代码。只有用户主动发起 AI 分析时，相关上下文才会提交到所选服务商。不要选择包含私钥、生产凭据或无关个人数据的目录。
 
 ## 赞助支持
 
-VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、个人站长及项目团队提供稳定、灵活的云计算资源，适用于网站部署、应用托管、开发测试以及个人项目运行等场景。感谢 VPS.Town 对 MetaCore AI 项目开发与开源工作的支持。
+VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、个人站长及项目团队提供稳定、灵活的云计算资源，适用于网站部署、应用托管、开发测试以及个人项目运行等场景。感谢 VPS.Town 对 MetaCore Studio 项目开发与开源工作的支持。
 
 <a href="https://vps.town/" target="_blank" rel="noreferrer">
   <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />
@@ -116,8 +116,8 @@ VPS.Town 是一家专注于 VPS 与云服务器服务的平台，为开发者、
 ### 完整模式
 
 ```bash
-git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
-cd MetaCore-AI
+git clone https://github.com/LEO-Ricardo20/MetaCore-Studio.git
+cd MetaCore-Studio
 npm ci
 ```
 
@@ -297,10 +297,10 @@ npm run build
 
 ## 版本规范
 
-MetaCore AI 遵循[语义化版本](https://semver.org/lang/zh-CN/)：
+MetaCore Studio 遵循[语义化版本](https://semver.org/lang/zh-CN/)：
 
 - **主版本** `2.0.0`：不兼容的架构或工作流变化
-- **次版本** `2.1.0`：向后兼容的新功能
+- **次版本** `2.2.0`：向后兼容的新功能或品牌升级
 - **修订版本** `2.0.1`：向后兼容的问题修复和文档调整
 
 `package.json` 是应用版本的唯一来源。前端和 localhost 服务会在运行时读取该版本。发布脚本和更新日志应在同一个发布提交中同步更新。

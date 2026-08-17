@@ -1,4 +1,4 @@
-# MetaCore AI 本地服务 API
+# MetaCore Studio 本地服务 API
 
 默认地址：`http://127.0.0.1:3766/api`
 

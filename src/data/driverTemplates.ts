@@ -286,7 +286,7 @@ void app_main(void) {
     /* 使用方案中分配的 I2C 引脚，SSD1306 默认 I2C 地址 0x3C */
     ESP_ERROR_CHECK(oled_init(GPIO_SDA, GPIO_SCL, 0x3C));
     oled_clear();
-    oled_show_text(0, 0, "MetaCore AI");
+    oled_show_text(0, 0, "MetaCore Studio");
     oled_show_text(0, 2, "Temp: 25.6C");
     oled_show_text(0, 3, "Humi: 65%");
     oled_flush();
@@ -369,7 +369,7 @@ void setup() {
     /* 使用方案中分配的 SDA/SCL 引脚 */
     oled_init(SDA_PIN, SCL_PIN);
     oled_clear();
-    oled_show_text(0, "MetaCore AI");
+    oled_show_text(0, "MetaCore Studio");
     oled_show_text(2, "Temp: --.-C");
     oled_show_text(3, "Humi: --%");
     oled_flush();

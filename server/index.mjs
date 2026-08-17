@@ -990,7 +990,7 @@ async function analyzeWorkspace() {
 
 function generateMarkdownReport(analysis) {
   const lines = [
-    '# MetaCore AI 本地工程诊断报告',
+    '# MetaCore Studio 本地工程诊断报告',
     '',
     `- 工作区：${analysis.workspaceRoot}`,
     `- 扫描时间：${new Date(analysis.scannedAt).toLocaleString('zh-CN')}`,
@@ -1026,7 +1026,7 @@ function generateMarkdownReport(analysis) {
     '',
     ...analysis.dependencies.slice(0, 80).map((dep) => `- ${dep.name}（${dep.kind}）`),
     '',
-    '> 本报告由 MetaCore AI 本地工程分析模块生成，自动判断结果应结合芯片数据手册与实物测试复核。',
+    '> 本报告由 MetaCore Studio 本地工程分析模块生成，自动判断结果应结合芯片数据手册与实物测试复核。',
   ]
   return lines.join('\n')
 }
@@ -1062,7 +1062,7 @@ async function route(req, res) {
 
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    json(res, 200, { ok: true, service: 'metacore-local', version: PACKAGE_META.version, workspaceRoot, port: PORT }, origin)
+    json(res, 200, { ok: true, service: 'metacore-studio-local', version: PACKAGE_META.version, workspaceRoot, port: PORT }, origin)
     return
   }
 

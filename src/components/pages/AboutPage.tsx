@@ -222,7 +222,7 @@ export default function AboutPage() {
               </span>
             </div>
             <p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-600')}>
-              MetaCore AI 平台由开发者 <span className={cn('font-semibold', isDark ? 'text-indigo-400' : 'text-indigo-600')}>Leo</span> 独立设计与开发。
+              MetaCore Studio 平台由开发者 <span className={cn('font-semibold', isDark ? 'text-indigo-400' : 'text-indigo-600')}>Leo</span> 独立设计与开发。
               <br />
               本平台所有代码、设计、文档及相关知识产权均归 Leo 所有。
             </p>

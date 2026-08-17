@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentation
-    url: https://github.com/LEO-Ricardo20/MetaCore-AI#readme
+    url: https://github.com/LEO-Ricardo20/MetaCore-Studio#readme
     about: Review setup, AI provider, security, and troubleshooting documentation before opening an issue.
   - name: Security policy
-    url: https://github.com/LEO-Ricardo20/MetaCore-AI/security/policy
+    url: https://github.com/LEO-Ricardo20/MetaCore-Studio/security/policy
     about: Do not report sensitive vulnerabilities or credentials in a public issue.

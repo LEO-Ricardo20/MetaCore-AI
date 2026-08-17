@@ -1,4 +1,4 @@
-# MetaCore AI Portable Project Files
+# MetaCore Studio Portable Project Files
 
 [English](#english) | [简体中文](#简体中文)
 
@@ -24,8 +24,8 @@ Current envelope:
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.1.0",
-  "exportedAt": "2026-08-04T00:00:00.000Z",
+  "appVersion": "2.2.0",
+  "exportedAt": "2026-08-17T00:00:00.000Z",
   "project": {}
 }
 ```

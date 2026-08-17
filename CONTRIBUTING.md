@@ -1,10 +1,10 @@
-# Contributing to MetaCore AI
+# Contributing to MetaCore Studio
 
 [English](#english) | [简体中文](#简体中文)
 
 ## English
 
-Thank you for helping improve MetaCore AI. Contributions should stay focused on embedded engineering workflows, hardware safety, maintainable frontend architecture, and controlled localhost operations.
+Thank you for helping improve MetaCore Studio. Contributions should stay focused on embedded engineering workflows, hardware safety, maintainable frontend architecture, and controlled localhost operations.
 
 ### Development setup
 
@@ -40,7 +40,7 @@ npm run check
 
 ## 简体中文
 
-感谢参与改进 MetaCore AI。贡献内容应围绕嵌入式工程流程、硬件安全、可维护的前端架构以及受控的 localhost 本地操作展开。
+感谢参与改进 MetaCore Studio。贡献内容应围绕嵌入式工程流程、硬件安全、可维护的前端架构以及受控的 localhost 本地操作展开。
 
 ### 开发环境
 

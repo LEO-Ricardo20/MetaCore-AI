@@ -134,7 +134,7 @@ export function parsePortableProject(text: string): Project {
     throw new Error('项目文件不是有效的 JSON')
   }
   if (!isRecord(value)) throw new Error('项目文件必须是 JSON 对象')
-  if (value.kind !== ARCHIVE_KIND) throw new Error('这不是 MetaCore AI 项目文件')
+  if (value.kind !== ARCHIVE_KIND) throw new Error('这不是 MetaCore Studio 项目文件')
   if (value.schemaVersion !== ARCHIVE_SCHEMA_VERSION) {
     throw new Error(`不支持的项目文件版本：${String(value.schemaVersion)}`)
   }

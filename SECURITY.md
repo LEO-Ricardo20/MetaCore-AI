@@ -32,6 +32,6 @@ Include only the information required to reproduce the problem:
 
 ## Dependency audit note
 
-As of `2026-08-04`, `npm audit` reports one upstream React Router advisory through both `react-router` and `react-router-dom`: [GHSA-qwww-vcr4-c8h2](https://github.com/advisories/GHSA-qwww-vcr4-c8h2). The advisory affects React Server Components action handling. MetaCore AI uses a client-only `HashRouter` and does not enable React Server Components, route actions, or server-side React Router execution. `react-router-dom` remains pinned to `7.18.2` for the current client API and must be upgraded when a compatible upstream fix becomes available. Do not use `npm audit fix --force` to apply the suggested downgrade.
+As of `2026-08-04`, `npm audit` reports one upstream React Router advisory through both `react-router` and `react-router-dom`: [GHSA-qwww-vcr4-c8h2](https://github.com/advisories/GHSA-qwww-vcr4-c8h2). The advisory affects React Server Components action handling. MetaCore Studio uses a client-only `HashRouter` and does not enable React Server Components, route actions, or server-side React Router execution. `react-router-dom` remains pinned to `7.18.2` for the current client API and must be upgraded when a compatible upstream fix becomes available. Do not use `npm audit fix --force` to apply the suggested downgrade.
 
 中文说明：请勿在公开 Issue 中提交漏洞细节、API Key、访问令牌、私人源代码或本地工作区数据。优先使用 GitHub 私密漏洞报告功能，并在公开讨论前删除所有敏感信息。

@@ -1,6 +1,6 @@
 # ESP32 智慧环境监测节点
 
-该工程用于演示 MetaCore AI 的本地工程诊断、代码分析和构建检测能力。
+该工程用于演示 MetaCore Studio 的本地工程诊断、代码分析和构建检测能力。
 
 功能：
 
@@ -10,7 +10,7 @@
 - SSD1306 OLED 本地显示
 - PlatformIO 工程构建
 
-演示时将 MetaCore AI 的本地工作区设置为本目录，然后点击“扫描”。系统应识别：
+演示时将 MetaCore Studio 的本地工作区设置为本目录，然后点击“扫描”。系统应识别：
 
 - PlatformIO / Arduino
 - ESP32

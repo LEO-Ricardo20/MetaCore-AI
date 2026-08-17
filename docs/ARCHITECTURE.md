@@ -1,10 +1,10 @@
-# MetaCore AI Architecture
+# MetaCore Studio Architecture
 
 [English](#english) | [简体中文](#简体中文)
 
 ## English
 
-MetaCore AI has two runtime layers:
+MetaCore Studio has two runtime layers:
 
 1. A React browser application for project state, hardware workflows, AI interaction, visualization, and export.
 2. An optional Node.js localhost service for AI proxying, controlled workspace access, analysis, backups, editing, and allowlisted builds.
@@ -55,7 +55,7 @@ Portable project files contain only the selected project's design data. AI servi
 
 ## 简体中文
 
-MetaCore AI 包含两个运行层：React 浏览器应用负责项目状态、硬件流程、AI 交互、可视化和导出；可选的 Node.js localhost 服务负责 AI 代理、受控工作区访问、工程分析、备份、编辑和白名单构建。
+MetaCore Studio 包含两个运行层：React 浏览器应用负责项目状态、硬件流程、AI 交互、可视化和导出；可选的 Node.js localhost 服务负责 AI 代理、受控工作区访问、工程分析、备份、编辑和白名单构建。
 
 ### 前端模块边界
 

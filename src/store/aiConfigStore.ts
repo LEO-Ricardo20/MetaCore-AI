@@ -46,6 +46,7 @@ export const useAIConfigStore = create<AIConfigState>()(
         )) ?? null
       }
     }),
+    // Keep the pre-Studio key so existing provider settings survive the product rename.
     { name: 'metacore-ai-config' }
   )
 )

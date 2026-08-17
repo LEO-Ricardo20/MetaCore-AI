@@ -159,7 +159,7 @@ try {
   assert.ok(backups.backups.length >= 1)
 
   const report = await request('/report', { method: 'POST' })
-  assert.match(report.markdown, /MetaCore AI 本地工程诊断报告/)
+  assert.match(report.markdown, /MetaCore Studio 本地工程诊断报告/)
   assert.match(report.markdown, /PlatformIO/)
 
   const build = await request('/build/detect')

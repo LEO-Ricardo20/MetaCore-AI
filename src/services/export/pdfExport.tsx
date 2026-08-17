@@ -259,7 +259,7 @@ function SchemeDocument({ project }: Props) {
           )}
         </View>
 
-        <Text style={styles.footer}>MetaCore AI · AI驱动的硬件架构工程师工具</Text>
+        <Text style={styles.footer}>MetaCore Studio · AI驱动的硬件架构工程师工具</Text>
         <View style={styles.pageNumber}>
           <Text style={styles.pageNumberText}>封面</Text>
           <Text style={styles.pageNumberText}>1 / 4</Text>
@@ -292,7 +292,7 @@ function SchemeDocument({ project }: Props) {
           ))}
         </View>
 
-        <Text style={styles.footer}>MetaCore AI · AI驱动的硬件架构工程师工具</Text>
+        <Text style={styles.footer}>MetaCore Studio · AI驱动的硬件架构工程师工具</Text>
         <View style={styles.pageNumber}>
           <Text style={styles.pageNumberText}>引脚分配</Text>
           <Text style={styles.pageNumberText}>2 / 4</Text>
@@ -329,7 +329,7 @@ function SchemeDocument({ project }: Props) {
           <Text style={styles.bomTotalValue}>¥ {totalPrice.toFixed(2)}</Text>
         </View>
 
-        <Text style={styles.footer}>MetaCore AI · AI驱动的硬件架构工程师工具</Text>
+        <Text style={styles.footer}>MetaCore Studio · AI驱动的硬件架构工程师工具</Text>
         <View style={styles.pageNumber}>
           <Text style={styles.pageNumberText}>BOM 物料清单</Text>
           <Text style={styles.pageNumberText}>3 / 4</Text>
@@ -372,7 +372,7 @@ function SchemeDocument({ project }: Props) {
           ))}
         </View>
 
-        <Text style={styles.footer}>MetaCore AI · AI驱动的硬件架构工程师工具</Text>
+        <Text style={styles.footer}>MetaCore Studio · AI驱动的硬件架构工程师工具</Text>
         <View style={styles.pageNumber}>
           <Text style={styles.pageNumberText}>接线对照 & 代码文件</Text>
           <Text style={styles.pageNumberText}>4 / 4</Text>

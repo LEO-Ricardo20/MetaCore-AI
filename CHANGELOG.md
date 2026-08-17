@@ -1,10 +1,23 @@
 # Changelog
 
-All notable changes to MetaCore AI are documented in this file.
+All notable changes to MetaCore Studio are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-MM-DD`.
 
 ## [Unreleased]
+
+## [2.2.0] - 2026-08-17
+
+### Changed
+
+- Renamed the product from MetaCore AI to MetaCore Studio across the web UI, documentation, reports, prompts, startup scripts, examples, and repository metadata.
+- Renamed the npm package to `metacore-studio` and the GitHub repository slug to `MetaCore-Studio`.
+- Updated browser metadata, logo accessibility text, and Chinese and English release documentation for the new brand.
+
+### Compatibility
+
+- Preserved existing browser storage keys so saved projects, AI provider settings, chips, themes, and user preferences continue to load after the rename.
+- Preserved the `metacore.project` archive kind, `.metacore.json` files, `.metacore-backups`, localhost configuration filename, and localhost API routes.
 
 ## [2.1.0] - 2026-08-04
 
@@ -33,7 +46,7 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ### Added
 
-- Unified MetaCore AI SVG, browser favicon, and Apple touch icon assets.
+- Unified MetaCore Studio SVG, browser favicon, and Apple touch icon assets.
 - Reusable `MetaCoreLogo` component for consistent application branding.
 - GitHub issue forms, pull request template, contribution guide, security policy, code of conduct, and repository license file.
 - Runtime validation for AI-generated hardware schemes, code files, flow graphs, verification results, and chip specifications.

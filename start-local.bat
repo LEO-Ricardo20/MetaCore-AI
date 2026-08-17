@@ -2,7 +2,7 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
-echo MetaCore AI 本地工程模式
+echo MetaCore Studio 本地工程模式
 echo ========================
 echo.
 
@@ -15,7 +15,7 @@ if %errorlevel% neq 0 (
 )
 node -e "const [major,minor]=process.versions.node.split('.').map(Number);process.exit(major^>20 ^|^| major===20 ^&^& minor^>=19?0:1)"
 if %errorlevel% neq 0 (
-    echo [错误] MetaCore AI 需要 Node.js 20.19 或更高版本
+    echo [错误] MetaCore Studio 需要 Node.js 20.19 或更高版本
     pause
     exit /b 1
 )

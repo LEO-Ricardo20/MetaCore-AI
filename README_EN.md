@@ -1,9 +1,9 @@
-# MetaCore AI
+# MetaCore Studio
 
 [English](./README_EN.md) | [简体中文](./README.md)
 
 <p align="center">
-  <img src="./public/logo.svg" alt="MetaCore AI logo" width="96" />
+  <img src="./public/logo.svg" alt="MetaCore Studio logo" width="96" />
 </p>
 
 > AI-assisted hardware architecture and embedded project analysis for ESP32, STM32, and custom chips.
@@ -16,10 +16,10 @@ Documentation language: English with Chinese UI names where they match the appli
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev/)
 [![Node](https://img.shields.io/badge/Node.js-20.19%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-AI?label=version&color=16a34a)](#release-status)
+[![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-Studio?label=version&color=16a34a)](#release-status)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#license)
 
-MetaCore AI turns a natural-language hardware requirement into a structured embedded design workflow:
+MetaCore Studio turns a natural-language hardware requirement into a structured embedded design workflow:
 
 ```text
 Requirement -> Hardware scheme -> Pin/BOM/Wiring -> Firmware -> Flow graph -> Local diagnosis -> Export
@@ -84,19 +84,19 @@ The localhost service provides the local AI proxy and the `本地` workspace bou
 
 ## Release Status
 
-Current release: **v2.1.0** (`2026-08-04`)
+Current release: **v2.2.0** (`2026-08-17`)
 
-Version 2.1.0 replaces duplicated project state with one canonical store, adds validated versioned project import/export, and separates localhost configuration, HTTP, path security, and provider transport modules. Supplier integration remains an adapter contract only; this release does not add a public cloud AI API, shared provider key, billing, or quotas. Version 2.0.1 added AI cancellation, runtime validation, canonical workspace security, code splitting, automated tests, and GitHub Actions.
+Version 2.2.0 renames the product from **MetaCore AI** to **MetaCore Studio** and updates the application UI, npm package, GitHub repository links, documentation, startup scripts, exported reports, and examples. Existing browser storage keys, `.metacore.json` project archives, `.metacore-backups`, and localhost API paths remain compatible so current users can upgrade without losing local data.
 
 > [!IMPORTANT]
-> MetaCore AI generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
+> MetaCore Studio generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
 
 > [!CAUTION]
 > The local workspace can expose source files to the application. AI providers only receive local engineering context when you explicitly start an AI analysis, but you should still avoid selecting folders containing private keys, production credentials, or unrelated personal data.
 
 ## Sponsor
 
-VPS.Town is a platform focused on VPS and cloud server services, providing stable and flexible cloud resources for developers, personal website owners, and project teams. Its services are suitable for website deployment, application hosting, development and testing, and personal project operations. We thank VPS.Town for supporting the development and open-source work of MetaCore AI.
+VPS.Town is a platform focused on VPS and cloud server services, providing stable and flexible cloud resources for developers, personal website owners, and project teams. Its services are suitable for website deployment, application hosting, development and testing, and personal project operations. We thank VPS.Town for supporting the development and open-source work of MetaCore Studio.
 
 <a href="https://vps.town/" target="_blank" rel="noreferrer">
   <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />
@@ -117,8 +117,8 @@ VPS.Town is a platform focused on VPS and cloud server services, providing stabl
 ### Browser application
 
 ```bash
-git clone https://github.com/LEO-Ricardo20/MetaCore-AI.git
-cd MetaCore-AI
+git clone https://github.com/LEO-Ricardo20/MetaCore-Studio.git
+cd MetaCore-Studio
 npm ci
 npm run dev
 ```
@@ -173,7 +173,7 @@ Custom endpoints can use either the Responses API or Chat Completions. CCH-compa
 
 AI keys are stored in the browser's `localStorage` by the current implementation. Browser storage is outside the Git working tree and is not included by `git add`, commit, or push. When the localhost service is running, AI requests use the local proxy; the service forwards the key only to the configured provider and does not persist it or write it to operation logs. If the proxy is unavailable, the client may fall back to a browser-direct request when the provider permits CORS.
 
-MetaCore AI does not currently provide a public cloud AI API. Future supplier integrations should implement the existing `call` and `listModels` adapter contract in a separately secured service with authentication, rate limits, and cost controls. Supplier secrets must never be committed to this repository.
+MetaCore Studio does not currently provide a public cloud AI API. Future supplier integrations should implement the existing `call` and `listModels` adapter contract in a separately secured service with authentication, rate limits, and cost controls. Supplier secrets must never be committed to this repository.
 
 Do not use a shared browser profile for production credentials. Clear the site's browser data before handing the computer to another user, never place real keys in source files, screenshots, issues, or exported configuration, and review the provider's privacy policy before sending source code or datasheets for analysis.
 
@@ -283,10 +283,10 @@ npm run build
 
 ## Versioning
 
-MetaCore AI follows [Semantic Versioning](https://semver.org/):
+MetaCore Studio follows [Semantic Versioning](https://semver.org/):
 
 - **Major** (`2.0.0`): incompatible architecture or workflow changes
-- **Minor** (`2.1.0`): backward-compatible features
+- **Minor** (`2.2.0`): backward-compatible features or branding updates
 - **Patch** (`2.0.1`): backward-compatible fixes and documentation corrections
 
 The canonical application version is stored in `package.json`. The frontend and localhost service read this value at runtime. Release-facing scripts and the changelog should be updated in the same release commit.

@@ -19,7 +19,7 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
   const isDark = theme === 'dark'
 
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '你好！我是 MetaCore AI 硬件工程助手。你可以问我关于硬件设计、代码逻辑、引脚配置、方案优化等问题。' }
+    { role: 'assistant', content: '你好！我是 MetaCore Studio 硬件工程助手。你可以问我关于硬件设计、代码逻辑、引脚配置、方案优化等问题。' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
