@@ -13,16 +13,19 @@ import type {
   WorkspaceAnalysis,
   WorkspaceInfo,
 } from './types'
+import type { AgentEvent, AgentJob, AgentSession } from '@/types/agent'
+import type { PipelineStage } from '@/types/project'
 
 const API_BASE = 'http://127.0.0.1:3766/api'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  if (init?.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
   })
 
   const text = await res.text()
@@ -106,4 +109,44 @@ export function runBuild(profileId: string) {
 
 export function generateLocalReport() {
   return request<ReportResponse>('/report', { method: 'POST' })
+}
+
+export function createAgentSession(projectId: string, metadata: Record<string, string | number | boolean> = {}) {
+  return request<AgentSession>('/sessions', { method: 'POST', body: JSON.stringify({ projectId, metadata }) })
+}
+
+export function getAgentSession(sessionId: string) {
+  return request<AgentSession>(`/sessions/${encodeURIComponent(sessionId)}`)
+}
+
+export function createAgentJob<TPayload = unknown>(input: { projectId: string; stage: PipelineStage | 'ai'; sessionId?: string; payload?: TPayload }) {
+  return request<AgentJob>('/jobs', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function getAgentJob<TResult = unknown>(jobId: string) {
+  return request<AgentJob<TResult>>(`/jobs/${encodeURIComponent(jobId)}`)
+}
+
+export function cancelAgentJob(jobId: string) {
+  return request<AgentJob>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' })
+}
+
+export function retryAgentJob(jobId: string) {
+  return request<AgentJob>(`/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' })
+}
+
+export function subscribeAgentEvents(
+  scope: 'jobs' | 'sessions',
+  id: string,
+  onEvent: (event: AgentEvent) => void,
+  onError?: (event: Event) => void,
+) {
+  const source = new EventSource(`${API_BASE}/${scope}/${encodeURIComponent(id)}/events`)
+  const eventTypes = ['session.created', 'session.resumed', 'stage.started', 'stage.progress', 'tool.before', 'tool.approval-required', 'tool.executing', 'tool.completed', 'tool.failed', 'validation.started', 'validation.completed', 'build.started', 'build.completed', 'job.cancelled', 'stage.completed', 'stage.failed']
+  const handler = (message: MessageEvent) => {
+    try { onEvent(JSON.parse(message.data) as AgentEvent) } catch { /* ignore malformed provider events */ }
+  }
+  eventTypes.forEach((type) => source.addEventListener(type, handler as EventListener))
+  if (onError) source.onerror = onError
+  return () => source.close()
 }

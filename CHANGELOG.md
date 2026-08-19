@@ -6,6 +6,20 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+### Added
+
+- Added the Project Schema v2 lifecycle model, artifact freshness propagation, pipeline run metadata, and explicit project version support.
+- Added the internal Harness-inspired Agent Runtime with static plugin/service/tool registries, background jobs, cancellation, retry, SSE events, sessions, and redacted JSONL trajectories.
+- Added versioned AI Task Contracts and budgeted, relevance-scored code context selection for flow and consistency tasks.
+- Added product workflow, Agent architecture, security model, local API, and portable project format documentation.
+- Added deterministic browser workflow coverage plus a real ESP32 PlatformIO workspace smoke test.
+
+### Changed
+
+- Consolidated the browser information architecture into Workspace, Design, Implementation, Verification, and Projects, while keeping legacy routes redirect-compatible.
+- Migrated persisted projects without clearing the existing `metacore-projects` browser storage key.
+- Updated localhost requests and delivery verification so real workspace scanning is exercised through the browser UI.
+
 ## [2.2.0] - 2026-08-17
 
 ### Changed

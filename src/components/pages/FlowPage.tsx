@@ -1,52 +1,37 @@
 /** 流程图页 — 自动分析代码执行流程，生成可交互的可视化节点图 */
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
-import { useAIConfigStore } from '@/store/aiConfigStore'
 import { useThemeStore } from '@/store/themeStore'
-import { runFlowgen } from '@/services/ai/flowgen'
+import { startGeneration, cancelGeneration } from '@/services/ai/generationCoordinator'
+import GenerationProgress from '@/components/generation/GenerationProgress'
+import { useGenerationStore } from '@/store/generationStore'
 import FlowCanvas from '@/components/flow/FlowCanvas'
 import AIChatPanel from '@/components/flow/AIChatPanel'
-import { Loader2, GitBranch, AlertCircle, MessageSquare, Sparkles, Info, Square } from 'lucide-react'
+import { GitBranch, AlertCircle, MessageSquare, Sparkles, Info, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function FlowPage() {
   const navigate = useNavigate()
   const project = useProjectStore(selectCurrentProject)
-  const { setFlowData, setGenerating, isGeneratingFlow } = useProjectStore()
-  const { getActive } = useAIConfigStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
 
   const [error, setError] = useState('')
   const [chatOpen, setChatOpen] = useState(false)
-  const generationController = useRef<AbortController | null>(null)
-
-  useEffect(() => () => generationController.current?.abort(), [])
+  const generation = useGenerationStore()
+  const isGeneratingFlow = generation.status === 'running' && generation.projectId === project?.id && (generation.mode === 'flow-only' || generation.mode === 'full-generation')
 
   async function handleGenerate() {
-    if (!project?.codeFiles.length) return
-    const svc = getActive()
-    if (!svc) { setError('请先在设置页配置并选择 AI 服务'); return }
+    if (!project?.codeFiles.length) { navigate('/implementation/code'); return }
+    if (isGeneratingFlow) { cancelGeneration(); return }
     setError('')
-    setGenerating('flow', true)
-    const controller = new AbortController()
-    generationController.current?.abort()
-    generationController.current = controller
     try {
-      const result = await runFlowgen(svc, project.codeFiles, { signal: controller.signal })
-      setFlowData(result.nodes, result.edges)
+      await startGeneration({ mode: 'flow-only', projectId: project.id })
     } catch (e: any) {
-      setError(e.message)
-    } finally {
-      if (generationController.current === controller) generationController.current = null
-      setGenerating('flow', false)
+      setError(String(e?.message ?? e))
     }
-  }
-
-  function handleCancelGeneration() {
-    generationController.current?.abort()
   }
 
   if (!project?.codeFiles.length) {
@@ -133,7 +118,7 @@ export default function FlowPage() {
 
           {project.flowNodes.length === 0 && (
             <button
-              onClick={isGeneratingFlow ? handleCancelGeneration : handleGenerate}
+              onClick={handleGenerate}
               className={cn(
                 'flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-xl transition-all',
                 isGeneratingFlow
@@ -149,24 +134,7 @@ export default function FlowPage() {
       </div>
 
       {/* 加载状态 */}
-      {isGeneratingFlow && (
-        <div className={cn(
-          'flex flex-col items-center justify-center py-12 gap-4',
-          isDark ? 'text-slate-400' : 'text-slate-500'
-        )}>
-          <div className="relative">
-            <Loader2 size={32} className="animate-spin text-indigo-400" />
-            <div className="absolute inset-0 blur-xl bg-indigo-500/20 rounded-full" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium text-indigo-400 mb-1">AI 正在分析代码逻辑</p>
-            <p className="text-xs text-slate-500">解析模块结构，构建执行流程...</p>
-          </div>
-          <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full progress-bar" />
-          </div>
-        </div>
-      )}
+      <div className="px-5 pt-4"><GenerationProgress projectId={project.id} /></div>
 
       {/* 主体 */}
       <div className="flex flex-1 overflow-hidden">

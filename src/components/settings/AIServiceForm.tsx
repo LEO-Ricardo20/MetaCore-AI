@@ -17,6 +17,7 @@ const PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'qwen', label: '通义千问' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'ollama', label: 'Ollama (本地)' },
+  { value: 'mock', label: 'MetaCore Mock（测试）' },
   { value: 'custom', label: '自定义 OpenAI 兼容服务' },
 ]
 
@@ -26,6 +27,7 @@ const DEFAULTS: Record<AIProvider, { baseURL: string; model: string; apiMode: AI
   qwen: { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', apiMode: 'chat-completions' },
   openai: { baseURL: 'https://api.openai.com/v1', model: 'gpt-4o', apiMode: 'responses' },
   ollama: { baseURL: 'http://127.0.0.1:11434/v1', model: 'llama3', apiMode: 'chat-completions' },
+  mock: { baseURL: 'http://127.0.0.1:3766/mock', model: 'metacore-deterministic', apiMode: 'chat-completions' },
   custom: { baseURL: '', model: '', apiMode: 'chat-completions' },
 }
 
@@ -48,7 +50,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
   const [modelOptions, setModelOptions] = useState<string[]>([])
   const [modelStatus, setModelStatus] = useState('')
 
-  const needsKey = form.provider !== 'ollama'
+  const needsKey = form.provider !== 'ollama' && form.provider !== 'mock'
 
   function handleProviderChange(provider: AIProvider) {
     const label = PROVIDERS.find((item) => item.value === provider)?.label ?? ''
@@ -59,7 +61,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
       ...current,
       provider,
       ...DEFAULTS[provider],
-      apiKey: provider === 'ollama' ? '' : current.apiKey,
+      apiKey: provider === 'ollama' || provider === 'mock' ? '' : current.apiKey,
       name: initial ? current.name : label,
     }))
   }
@@ -228,6 +230,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
             }} placeholder="https://api.example.com/v1" className={inputClass} />
             {form.provider === 'custom' && <Hint isDark={isDark}>自定义服务需要兼容所选 OpenAI API 协议，Base URL 通常以 /v1 结尾。</Hint>}
             {form.provider === 'ollama' && <Hint isDark={isDark}>默认地址为 http://127.0.0.1:11434/v1，请先运行 ollama serve。</Hint>}
+            {form.provider === 'mock' && <Hint isDark={isDark}>仅用于本地 E2E 和流程验收，不代表真实模型能力。</Hint>}
           </Field>
 
           {form.provider === 'custom' && (

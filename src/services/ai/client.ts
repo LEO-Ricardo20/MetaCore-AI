@@ -66,6 +66,12 @@ function requestError(raw: string, status: number, prefix = 'AI 请求失败') {
   return new AIRequestError(`${prefix} (${status})：${message}`, status, [502, 503, 504].includes(status))
 }
 
+function extractChatContent(message: any) {
+  if (typeof message?.content === 'string') return message.content
+  if (Array.isArray(message?.content)) return message.content.map((part: any) => typeof part === 'string' ? part : part?.text ?? part?.content ?? '').filter(Boolean).join('')
+  return ''
+}
+
 async function withRequestTimeout<T>(
   timeoutMs: number,
   externalSignal: AbortSignal | undefined,
@@ -128,7 +134,7 @@ async function callThroughLocalProxy(
   opts: CallAIOptions,
 ) {
   try {
-    return await withRequestTimeout(opts.timeoutMs ?? LOCAL_PROXY_TIMEOUT_MS, opts.signal, async (signal) => {
+    return await withRequestTimeout(opts.timeoutMs ?? service.timeoutMs ?? LOCAL_PROXY_TIMEOUT_MS, opts.signal, async (signal) => {
       const response = await fetch(`${LOCAL_AI_API}/call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,6 +165,7 @@ async function callThroughLocalProxy(
 }
 
 export async function fetchAIModels(service: AIServiceConfig): Promise<string[]> {
+  if (service.provider === 'mock') return [service.model || 'metacore-deterministic']
   try {
     return await withRequestTimeout(MODEL_LIST_TIMEOUT_MS, undefined, async (signal) => {
       const response = await fetch(`${LOCAL_AI_API}/models`, {
@@ -241,7 +248,7 @@ async function callAIChatCompletionsDirect(
   messages: ChatMessage[],
   opts: CallAIOptions,
 ): Promise<string> {
-  return withRequestTimeout(opts.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
+  return withRequestTimeout(opts.timeoutMs ?? service.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
     const onChunk = opts.onChunk
     const response = await fetch(`${normalizeBaseURL(service.baseURL)}/chat/completions`, {
       method: 'POST',
@@ -262,7 +269,7 @@ async function callAIChatCompletionsDirect(
 
     if (!onChunk) {
       const data = await response.json()
-      const content = data.choices?.[0]?.message?.content
+      const content = extractChatContent(data.choices?.[0]?.message)
       if (typeof content !== 'string' || !content) throw new AIRequestError('AI 服务没有返回文本内容', 502)
       return content
     }
@@ -276,7 +283,7 @@ async function callAIResponsesDirect(
   messages: ChatMessage[],
   opts: CallAIOptions,
 ): Promise<string> {
-  return withRequestTimeout(opts.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
+  return withRequestTimeout(opts.timeoutMs ?? service.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
     const onChunk = opts.onChunk
     const systemMessage = messages.find((message) => message.role === 'system')
     const inputMessages = messages.filter((message) => message.role !== 'system')
@@ -357,15 +364,24 @@ async function readSSEText(
 
 function extractResponsesText(data: any) {
   if (typeof data.output_text === 'string') return data.output_text
+  let text = ''
   for (const output of data.output ?? []) {
     for (const content of output.content ?? []) {
-      if (content.type === 'output_text' && typeof content.text === 'string') return content.text
+      if (content.type === 'output_text' && typeof content.text === 'string') text += content.text
     }
   }
-  return ''
+  return text
 }
 
 export async function testConnection(service: AIServiceConfig): Promise<AIConnectionResult> {
+  if (service.provider === 'mock') {
+    try {
+      const result = await callThroughLocalProxy(service, [{ role: 'user', content: 'Reply with OK only.' }], { temperature: 0, timeoutMs: 5_000 })
+      return { ok: Boolean(result), via: 'local-proxy' }
+    } catch (error: any) {
+      return { ok: false, error: error?.message ?? 'Mock Provider 连接失败，请启动本地服务' }
+    }
+  }
   try {
     const result = await invokeAI(service, [{ role: 'user', content: 'Reply with OK only.' }], { temperature: 0 })
     return { ok: true, via: result.via }

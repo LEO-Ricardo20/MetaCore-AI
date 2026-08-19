@@ -10,6 +10,7 @@ import type { ChipTarget, ProjectFormat, ChipSpec } from '@/types/hardware'
 import { chipSpecToPromptText, getChipSpec } from '@/data/chipSpecs'
 import { codeTemplateToPromptText } from '@/data/codeTemplates'
 import { matchDriverTemplates, driverTemplatesToPromptText } from '@/data/driverTemplates'
+import { buildCodeContext } from './contextBuilder'
 
 /** prompt 消息对（system + user） */
 export interface PromptPair {
@@ -165,6 +166,10 @@ export const CODEGEN_PROMPT = (scheme: HardwareScheme, target: ChipTarget, forma
 
 /** 生成代码执行流程图的 prompt */
 export function buildFlowPrompt(files: { path: string; content: string }[]): PromptPair {
+  const context = buildCodeContext(files, {
+    tokenBudget: 14_000,
+    keywords: ['setup', 'loop', 'app_main', 'task', 'init', 'error', 'mqtt', 'wifi', 'sensor', 'display'],
+  })
   return {
     system: `你是一位嵌入式代码分析专家，擅长提取 C/C++ 工程的执行流程并生成可视化节点图。
 
@@ -178,15 +183,16 @@ export function buildFlowPrompt(files: { path: string; content: string }[]): Pro
 
     user: `分析以下嵌入式工程代码，提取主要执行流程。
 
-代码文件：
-${files.map(f => `=== ${f.path} ===\n${f.content.slice(0, 1000)}`).join('\n\n')}
+代码上下文（按文件清单、函数索引、相关性和 Token 预算选择；包含文件后部函数）：
+${context.files.map(f => `=== ${f.path} | score=${f.score} ===\n函数索引：${f.functions.map(item => `${item.name}@${item.line}`).join('、') || '未识别'}\n${f.content}`).join('\n\n')}
 
 ## 节点设计原则
 1. 初始化节点：系统时钟、GPIO、外设、WiFi/蓝牙等初始化
 2. 任务节点：FreeRTOS 任务或主循环中的主要功能块
 3. 通信节点：MQTT 发布、HTTP 请求、串口收发等
 4. 数据处理节点：传感器数据读取、解析、存储
-5. 每个节点包含 label（4-10 字中文）、codeSnippet（3-5 行关键代码）、codeFileRef（来源文件）
+5. 每个节点包含 label、codeSnippet、codeFileRef、codeLine、functionName 和 evidence
+6. 必须覆盖分支、循环、异常处理和异步/FreeRTOS 任务，不得只分析文件开头
 
 ## 布局
 - position: {x: 100-800, y: 50-700}，从上到下、从左到右
@@ -195,7 +201,7 @@ ${files.map(f => `=== ${f.path} ===\n${f.content.slice(0, 1000)}`).join('\n\n')}
 
 {
   "nodes": [
-    { "id": "唯一ID", "label": "节点标签", "codeFileRef": "文件路径", "codeSnippet": "代码片段", "nodeStyle": "分类关键词", "position": { "x": 数字, "y": 数字 } }
+    { "id": "唯一ID", "label": "节点标签", "codeFileRef": "文件路径", "codeLine": 真实行号, "functionName": "真实函数", "evidence": "来源证据", "codeSnippet": "代码片段", "nodeStyle": "分类关键词", "position": { "x": 数字, "y": 数字 } }
   ],
   "edges": [
     { "id": "边ID", "source": "源节点ID", "target": "目标节点ID", "label": "边标签（可选）" }
@@ -244,13 +250,15 @@ export function buildVerifyPrompt(
   scheme: HardwareScheme,
   files: { path: string; content: string }[]
 ): string {
+  const keywords = scheme.pins.flatMap((pin) => [pin.pinNumber, pin.pinName, pin.function, pin.connectedTo])
+  const context = buildCodeContext(files, { tokenBudget: 14_000, keywords: [...keywords, 'gpio', 'pin', 'init', 'setup', 'error', 'i2c', 'spi', 'uart'] })
   return `请检查以下代码是否与硬件方案一致，列出所有不一致之处。
 
 硬件方案引脚分配：
 ${scheme.pins.map(p => `${p.pinNumber} -> ${p.function} -> ${p.connectedTo}`).join('\n')}
 
-代码文件：
-${files.map(f => `--- ${f.path} ---\n${f.content.slice(0, 800)}`).join('\n\n')}
+相关代码上下文（按引脚、宏、函数、初始化和驱动相关性选择）：
+${context.files.map(f => `--- ${f.path} | functions=${f.functions.map(item => `${item.name}@${item.line}`).join(',')} ---\n${f.content}`).join('\n\n')}
 
 检查项：
 1. 代码中的引脚编号是否与方案一致
@@ -258,8 +266,8 @@ ${files.map(f => `--- ${f.path} ---\n${f.content.slice(0, 800)}`).join('\n\n')}
 3. I2C/SPI 地址是否正确
 4. 初始化顺序是否合理
 
-如果完全一致，输出：{"consistent": true, "issues": []}
-如果有问题，输出：{"consistent": false, "issues": ["问题1", "问题2"]}
+输出：{"consistent": true, "score": 100, "issues": []}
+如果有问题，issues 每项必须为：{"severity":"info|warning|error","category":"pin|peripheral|dependency|initialization|safety","message":"问题","evidence":"真实代码或方案证据","file":"文件路径","line":真实行号,"expected":"期望","actual":"实际","fixSuggestion":"修复建议"}
 仅输出 JSON。`
 }
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Project } from '@/types/project'
 import { createPortableProject, parsePortableProject, serializePortableProject } from './portableProject'
+import { normalizeProject } from './projectLifecycle'
 
-const project: Project = {
+const project: Project = normalizeProject({
   id: 'project-1',
   name: 'ESP32 环境监测',
   requirement: '读取温湿度并通过 MQTT 上报',
@@ -20,7 +21,7 @@ const project: Project = {
   flowEdges: [],
   createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_000_100,
-}
+})
 
 describe('portable project files', () => {
   it('round-trips a complete project', () => {
@@ -45,5 +46,30 @@ describe('portable project files', () => {
   it('rejects unknown archive schemas', () => {
     const archive = { ...createPortableProject(project), schemaVersion: 99 }
     expect(() => parsePortableProject(JSON.stringify(archive))).toThrow(/不支持的项目文件版本/)
+  })
+
+  it('preserves lifecycle metadata without exporting session references or raw responses', () => {
+    const lifecycleProject: Project = {
+      ...project,
+      currentStage: 'verification',
+      lastSessionId: 'local-session',
+      versions: [{ id: 'v2', label: 'Review', createdAt: 1_700_000_000_200, sourceProjectId: project.id, schemeVersion: 1, codeVersion: 1 }],
+      runs: [{
+        id: 'run-1',
+        status: 'succeeded',
+        createdAt: 1_700_000_000_200,
+        sessionId: 'local-session',
+        currentStage: 'code-generation',
+        stages: [{ id: 'code-generation', status: 'succeeded', progress: 100, currentAction: 'done', retryCount: 0, rawResponse: 'sensitive raw output' }],
+      }],
+    }
+    const serialized = serializePortableProject(lifecycleProject)
+    const parsed = parsePortableProject(serialized)
+
+    expect(serialized).not.toContain('local-session')
+    expect(serialized).not.toContain('sensitive raw output')
+    expect(parsed.currentStage).toBe('verification')
+    expect(parsed.versions[0].label).toBe('Review')
+    expect(parsed.runs[0].stages[0].status).toBe('succeeded')
   })
 })

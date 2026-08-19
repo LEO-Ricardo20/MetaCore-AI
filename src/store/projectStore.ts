@@ -1,9 +1,37 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, CodeFile, FlowNode, FlowEdge, HardwareScheme } from '@/types/project'
+import type {
+  ArtifactKey,
+  ArtifactStatus,
+  CodeFile,
+  FlowEdge,
+  FlowNode,
+  HardwareScheme,
+  PipelineStage,
+  PipelineStageState,
+  Project,
+  ProjectRun,
+  StageRunStatus,
+} from '@/types/project'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
+import {
+  createProjectArtifacts,
+  createProjectRun,
+  markArtifactsStale,
+  normalizeProject,
+  updateArtifact,
+  validationFromArtifacts,
+} from '@/services/projects/projectLifecycle'
 
 type GenerationKey = 'scheme' | 'code' | 'flow'
+type ProjectCreateMode = 'update-current' | 'new-project' | 'new-version'
+
+interface ProjectInput {
+  requirement: string
+  target: ChipTarget
+  format: ProjectFormat
+  selectedDriverIds?: string[]
+}
 
 export interface ProjectState {
   projects: Project[]
@@ -13,6 +41,8 @@ export interface ProjectState {
   isGeneratingFlow: boolean
   selectedFile: string | null
   createProject: (requirement: string, target: ChipTarget, format: ProjectFormat, selectedDriverIds?: string[]) => Project
+  ensureProject: (input: ProjectInput, mode?: ProjectCreateMode) => Project
+  createProjectVersion: (label?: string) => Project | null
   importProject: (project: Project) => Project
   deleteProject: (id: string) => void
   loadProject: (id: string) => void
@@ -23,6 +53,11 @@ export interface ProjectState {
   setSelectedFile: (path: string) => void
   setGenerating: (key: GenerationKey, value: boolean) => void
   setSelectedDriverIds: (ids: string[]) => void
+  setArtifactStatus: (key: ArtifactKey, status: ArtifactStatus, staleReason?: string) => void
+  startPipeline: (fromStage?: PipelineStage, sessionId?: string) => ProjectRun | null
+  updatePipelineStage: (runId: string, stage: PipelineStage, updates: Partial<PipelineStageState>) => void
+  finishPipeline: (runId: string, status: Extract<StageRunStatus, 'succeeded' | 'failed' | 'cancelled'>) => void
+  retryPipeline: (runId: string, fromStage: PipelineStage) => void
   saveProject: (updates: Partial<Project>) => void
   reset: () => void
 }
@@ -39,16 +74,47 @@ function uniqueProjectId(projects: Project[], preferredId: string) {
   return id
 }
 
-function updateCurrentProject(state: ProjectState, updates: Partial<Project>) {
+function createProjectRecord(input: ProjectInput, source?: Project): Project {
+  const now = Date.now()
+  const base: Project = {
+    schemaVersion: 2,
+    id: createProjectId(),
+    name: input.requirement.slice(0, 30) || '未命名项目',
+    requirement: input.requirement,
+    target: input.target,
+    format: input.format,
+    selectedDriverIds: input.selectedDriverIds ?? [],
+    codeFiles: source?.codeFiles ?? [],
+    flowNodes: source?.flowNodes ?? [],
+    flowEdges: source?.flowEdges ?? [],
+    scheme: source?.scheme,
+    currentStage: source ? source.currentStage : input.requirement ? 'requirements-ready' : 'draft',
+    artifacts: createProjectArtifacts(source ?? { requirement: input.requirement, updatedAt: now }),
+    runs: [],
+    versions: source?.versions ?? [],
+    validation: source?.validation ?? { status: 'unchecked', issueCount: 0, blockingCount: 0 },
+    createdAt: now,
+    updatedAt: now,
+  }
+  return normalizeProject(base)
+}
+
+function updateCurrentProject(state: ProjectState, updater: Partial<Project> | ((project: Project) => Project)) {
   if (!state.currentProjectId) return null
   const updatedAt = Date.now()
   let current: Project | null = null
   const projects = state.projects.map((project) => {
     if (project.id !== state.currentProjectId) return project
-    current = { ...project, ...updates, updatedAt }
+    current = normalizeProject(typeof updater === 'function'
+      ? { ...updater(project), updatedAt }
+      : { ...project, ...updater, updatedAt })
     return current
   })
   return current ? { projects, current } : null
+}
+
+function withRun(project: Project, runId: string, updater: (run: ProjectRun) => ProjectRun) {
+  return { ...project, runs: project.runs.map((run) => run.id === runId ? updater(run) : run) }
 }
 
 export const selectCurrentProject = (state: Pick<ProjectState, 'projects' | 'currentProjectId'>) =>
@@ -64,34 +130,84 @@ export const useProjectStore = create<ProjectState>()(
       isGeneratingFlow: false,
       selectedFile: null,
 
-      createProject: (requirement, target, format, selectedDriverIds) => {
-        const now = Date.now()
-        const project: Project = {
-          id: createProjectId(),
-          name: requirement.slice(0, 30) || '未命名项目',
-          requirement,
-          target,
-          format,
-          selectedDriverIds: selectedDriverIds ?? [],
-          codeFiles: [],
-          flowNodes: [],
-          flowEdges: [],
-          createdAt: now,
-          updatedAt: now,
+      createProject: (requirement, target, format, selectedDriverIds) => (
+        get().ensureProject({ requirement, target, format, selectedDriverIds }, 'new-project')
+      ),
+
+      ensureProject: (input, mode = 'update-current') => {
+        const state = get()
+        const current = selectCurrentProject(state)
+        if (!current || mode === 'new-project' || mode === 'new-version') {
+          const created = createProjectRecord(input, mode === 'new-version' ? current ?? undefined : undefined)
+          if (current && mode === 'new-version') {
+            created.versions = [...current.versions, {
+              id: created.id,
+              label: `版本 ${current.versions.length + 1}`,
+              createdAt: created.createdAt,
+              sourceProjectId: current.id,
+              schemeVersion: current.artifacts.scheme.version,
+              codeVersion: current.artifacts.code.version,
+            }]
+          }
+          set((currentState) => ({
+            projects: [...currentState.projects, created],
+            currentProjectId: created.id,
+            selectedFile: created.codeFiles[0]?.path ?? null,
+          }))
+          return created
         }
-        set((state) => ({
-          projects: [...state.projects, project],
-          currentProjectId: project.id,
-          selectedFile: null,
-        }))
-        return project
+
+        let updated = current
+        set((currentState) => {
+          const result = updateCurrentProject(currentState, (project) => {
+            const requirementChanged = project.requirement !== input.requirement
+            const targetChanged = project.target !== input.target
+            const formatChanged = project.format !== input.format
+            const driversChanged = JSON.stringify(project.selectedDriverIds ?? []) !== JSON.stringify(input.selectedDriverIds ?? [])
+            let artifacts = project.artifacts
+            if (requirementChanged || driversChanged) artifacts = markArtifactsStale(artifacts, 'requirements')
+            if (targetChanged) artifacts = markArtifactsStale(artifacts, 'target')
+            if (formatChanged) artifacts = markArtifactsStale(artifacts, 'format')
+            if (requirementChanged) artifacts = updateArtifact(artifacts, 'requirements', 'fresh')
+            updated = {
+              ...project,
+              requirement: input.requirement,
+              target: input.target,
+              format: input.format,
+              selectedDriverIds: input.selectedDriverIds ?? [],
+              currentStage: 'requirements-ready',
+              artifacts,
+              validation: validationFromArtifacts(artifacts),
+            }
+            return updated
+          })
+          return result ? { projects: result.projects } : currentState
+        })
+        return updated
+      },
+
+      createProjectVersion: (label) => {
+        const current = get().getCurrentProject()
+        if (!current) return null
+        const created = get().ensureProject({
+          requirement: current.requirement,
+          target: current.target,
+          format: current.format,
+          selectedDriverIds: current.selectedDriverIds,
+        }, 'new-version')
+        if (label) {
+          get().saveProject({
+            versions: created.versions.map((version, index) => index === created.versions.length - 1 ? { ...version, label } : version),
+          })
+        }
+        return get().getCurrentProject()
       },
 
       importProject: (project) => {
-        let imported = project
+        let imported = normalizeProject(project)
         set((state) => {
-          const id = uniqueProjectId(state.projects, project.id)
-          imported = { ...project, id, updatedAt: Date.now() }
+          const id = uniqueProjectId(state.projects, imported.id)
+          imported = { ...imported, id, updatedAt: Date.now() }
           return {
             projects: [...state.projects, imported],
             currentProjectId: id,
@@ -113,41 +229,136 @@ export const useProjectStore = create<ProjectState>()(
       loadProject: (id) => set((state) => {
         const project = state.projects.find((item) => item.id === id)
         if (!project) return state
-        return {
-          currentProjectId: id,
-          selectedFile: project.codeFiles[0]?.path ?? null,
-        }
+        return { currentProjectId: id, selectedFile: project.codeFiles[0]?.path ?? null }
       }),
 
       getCurrentProject: () => selectCurrentProject(get()),
 
       setScheme: (scheme) => set((state) => {
-        const result = updateCurrentProject(state, { scheme })
+        const result = updateCurrentProject(state, (project) => {
+          let artifacts = markArtifactsStale(project.artifacts, 'scheme')
+          artifacts = updateArtifact(artifacts, 'scheme', 'fresh')
+          artifacts = updateArtifact(artifacts, 'pinMap', scheme.pins.length ? 'fresh' : 'missing')
+          artifacts = updateArtifact(artifacts, 'bom', scheme.bom.length ? 'fresh' : 'missing')
+          artifacts = updateArtifact(artifacts, 'wiring', scheme.wiring.length ? 'fresh' : 'missing')
+          return { ...project, scheme, currentStage: 'design-review', artifacts, validation: validationFromArtifacts(artifacts) }
+        })
         return result ? { projects: result.projects } : state
       }),
 
       setCodeFiles: (codeFiles) => set((state) => {
-        const result = updateCurrentProject(state, { codeFiles })
-        return result
-          ? { projects: result.projects, selectedFile: codeFiles[0]?.path ?? null }
-          : state
+        const result = updateCurrentProject(state, (project) => {
+          let artifacts = markArtifactsStale(project.artifacts, 'code')
+          artifacts = updateArtifact(artifacts, 'code', codeFiles.length ? 'fresh' : 'missing')
+          return { ...project, codeFiles, currentStage: 'implementation', artifacts, validation: validationFromArtifacts(artifacts) }
+        })
+        return result ? { projects: result.projects, selectedFile: codeFiles[0]?.path ?? null } : state
       }),
 
       setFlowData: (flowNodes, flowEdges) => set((state) => {
-        const result = updateCurrentProject(state, { flowNodes, flowEdges })
+        const result = updateCurrentProject(state, (project) => ({
+          ...project,
+          flowNodes,
+          flowEdges,
+          currentStage: 'verification',
+          artifacts: updateArtifact(project.artifacts, 'flow', flowNodes.length ? 'fresh' : 'missing'),
+        }))
         return result ? { projects: result.projects } : state
       }),
 
       setSelectedFile: (selectedFile) => set({ selectedFile }),
 
       setSelectedDriverIds: (selectedDriverIds) => set((state) => {
-        const result = updateCurrentProject(state, { selectedDriverIds })
+        const result = updateCurrentProject(state, (project) => {
+          const artifacts = markArtifactsStale(project.artifacts, 'requirements')
+          return { ...project, selectedDriverIds, artifacts, validation: validationFromArtifacts(artifacts) }
+        })
         return result ? { projects: result.projects } : state
       }),
 
-      setGenerating: (key, value) => set({
-        [`isGenerating${key.charAt(0).toUpperCase() + key.slice(1)}`]: value,
-      } as Partial<ProjectState>),
+      setGenerating: (key, value) => set((state) => {
+        const property = `isGenerating${key.charAt(0).toUpperCase() + key.slice(1)}`
+        const result = updateCurrentProject(state, (project) => {
+          if (value) return { ...project, artifacts: updateArtifact(project.artifacts, key, 'generating') }
+          const current = project.artifacts[key]
+          if (current.status !== 'generating') return project
+          const hasArtifact = key === 'scheme' ? Boolean(project.scheme)
+            : key === 'code' ? project.codeFiles.length > 0
+              : key === 'flow' ? project.flowNodes.length > 0
+                : false
+          return { ...project, artifacts: updateArtifact(project.artifacts, key, hasArtifact ? 'stale' : 'missing', Date.now()) }
+        })
+        return { [property]: value, ...(result ? { projects: result.projects } : {}) } as Partial<ProjectState>
+      }),
+
+      setArtifactStatus: (key, status, staleReason) => set((state) => {
+        const result = updateCurrentProject(state, (project) => {
+          const artifacts = updateArtifact(project.artifacts, key, status)
+          return { ...project, artifacts: { ...artifacts, [key]: { ...artifacts[key], staleReason } } }
+        })
+        return result ? { projects: result.projects } : state
+      }),
+
+      startPipeline: (fromStage = 'requirements', sessionId) => {
+        const current = get().getCurrentProject()
+        if (!current) return null
+        const run = createProjectRun(createProjectId(), fromStage)
+        run.sessionId = sessionId
+        run.status = 'running'
+        run.startedAt = Date.now()
+        set((state) => {
+          const result = updateCurrentProject(state, (project) => ({
+            ...project,
+            currentStage: 'planning',
+            lastSessionId: sessionId ?? project.lastSessionId,
+            runs: [...project.runs, run],
+          }))
+          return result ? { projects: result.projects } : state
+        })
+        return run
+      },
+
+      updatePipelineStage: (runId, stage, updates) => set((state) => {
+        const result = updateCurrentProject(state, (project) => withRun(project, runId, (run) => ({
+          ...run,
+          currentStage: stage,
+          stages: run.stages.map((item) => item.id === stage ? { ...item, ...updates } : item),
+        })))
+        return result ? { projects: result.projects } : state
+      }),
+
+      finishPipeline: (runId, status) => set((state) => {
+        const result = updateCurrentProject(state, (project) => ({
+          ...withRun(project, runId, (run) => ({ ...run, status, finishedAt: Date.now() })),
+          // 各产物 setter 已经推进到准确阶段；完成流水线时不要无条件跳到验证页。
+          currentStage: status === 'cancelled' ? 'cancelled' : status === 'failed' ? 'failed' : project.currentStage,
+        }))
+        return result ? { projects: result.projects } : state
+      }),
+
+      retryPipeline: (runId, fromStage) => set((state) => {
+        const result = updateCurrentProject(state, (project) => withRun(project, runId, (run) => {
+          const start = run.stages.findIndex((stage) => stage.id === fromStage)
+          return {
+            ...run,
+            status: 'running',
+            currentStage: fromStage,
+            finishedAt: undefined,
+            stages: run.stages.map((stage, index) => index < start ? stage : {
+              ...stage,
+              status: 'waiting',
+              progress: 0,
+              currentAction: '',
+              startedAt: undefined,
+              finishedAt: undefined,
+              errorCode: undefined,
+              errorMessage: undefined,
+              retryCount: stage.retryCount + (index === start ? 1 : 0),
+            }),
+          }
+        }))
+        return result ? { projects: result.projects } : state
+      }),
 
       saveProject: (updates) => set((state) => {
         const result = updateCurrentProject(state, updates)
@@ -158,10 +369,15 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'metacore-projects',
-      partialize: (state) => ({
-        projects: state.projects,
-        currentProjectId: state.currentProjectId,
-      }),
+      version: 2,
+      migrate: (persisted) => {
+        const state = persisted as Partial<ProjectState> | undefined
+        return {
+          ...state,
+          projects: Array.isArray(state?.projects) ? state.projects.map((project) => normalizeProject(project)) : [],
+        } as ProjectState
+      },
+      partialize: (state) => ({ projects: state.projects, currentProjectId: state.currentProjectId }),
     },
   ),
 )

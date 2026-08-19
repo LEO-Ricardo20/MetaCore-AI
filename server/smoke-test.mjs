@@ -12,6 +12,7 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'metacore-local-test-'))
 const externalRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'metacore-local-external-'))
 const configPath = path.join(tempRoot, 'server-config.json')
+const sessionRoot = path.join(tempRoot, '.sessions')
 let server
 let mockAIProvider
 const mockAIRequests = []
@@ -29,6 +30,26 @@ async function request(route, init) {
   const { res, data } = await requestRaw(route, init)
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
   return data
+}
+
+async function readSSEEvents(route) {
+  const controller = new AbortController()
+  const res = await fetch(`${API}${route}`, { signal: controller.signal })
+  assert.equal(res.status, 200)
+  const reader = res.body.getReader()
+  const timer = setTimeout(() => controller.abort(), 2_000)
+  let text = ''
+  try {
+    while (!text.includes('stage.completed') && text.length < 100_000) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += new TextDecoder().decode(value)
+    }
+  } finally {
+    clearTimeout(timer)
+    controller.abort()
+  }
+  return [...text.matchAll(/^event:\s*(.+)$/gm)].map((match) => match[1])
 }
 
 async function startMockAIProvider() {
@@ -55,6 +76,10 @@ async function startMockAIProvider() {
       res.writeHead(503, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: { message: 'No available providers' } }))
       return
+    }
+
+    if (req.url?.includes('/slow/')) {
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -119,6 +144,7 @@ try {
       ...process.env,
       METACORE_LOCAL_PORT: String(PORT),
       METACORE_LOCAL_CONFIG: configPath,
+      METACORE_SESSION_ROOT: sessionRoot,
     },
     windowsHide: true,
     stdio: 'ignore',
@@ -154,6 +180,11 @@ try {
     }),
   })
   assert.ok(write.backup.id)
+  const conflict = await requestRaw('/files/write', {
+    method: 'POST',
+    body: JSON.stringify({ path: file.path, content: file.content, expectedModifiedAt: file.modifiedAt }),
+  })
+  assert.equal(conflict.res.status, 409)
 
   const backups = await request('/backups/list')
   assert.ok(backups.backups.length >= 1)
@@ -164,6 +195,24 @@ try {
 
   const build = await request('/build/detect')
   assert.ok(build.profiles.some((item) => item.id === 'platformio'))
+
+  const agentRegistry = await request('/agent/plugins')
+  assert.ok(agentRegistry.plugins.some((plugin) => plugin.id === 'metacore.internal'))
+  assert.ok(agentRegistry.tools.some((tool) => tool.name === 'write_file'))
+
+  const session = await request('/sessions', { method: 'POST', body: JSON.stringify({ projectId: 'smoke-project', metadata: { apiKey: 'must-not-log' } }) })
+  assert.equal(session.projectId, 'smoke-project')
+  const analysisJob = await request('/jobs', { method: 'POST', body: JSON.stringify({ projectId: 'smoke-project', sessionId: session.id, stage: 'local-analysis' }) })
+  let completedJob = analysisJob
+  for (let attempt = 0; attempt < 50 && completedJob.status !== 'succeeded'; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    completedJob = await request(`/jobs/${analysisJob.id}`)
+  }
+  assert.equal(completedJob.status, 'succeeded')
+  const eventTypes = await readSSEEvents(`/jobs/${analysisJob.id}/events`)
+  assert.deepEqual(eventTypes.slice(0, 2), ['stage.started', 'stage.started'])
+  assert.ok(eventTypes.includes('stage.progress'))
+  assert.ok(eventTypes.includes('stage.completed'))
 
   const missingKey = await requestRaw('/ai/call', {
     method: 'POST',
@@ -204,6 +253,26 @@ try {
   })
   assert.equal(customResponsesAI.content, 'OPENAI_OK')
 
+  const slowJob = await request('/jobs', {
+    method: 'POST',
+    body: JSON.stringify({
+      projectId: 'smoke-project',
+      sessionId: session.id,
+      stage: 'ai',
+      payload: {
+        service: { provider: 'custom', apiKey: 'smoke-key', baseURL: `http://127.0.0.1:${mockAIPort}/slow`, model: 'gpt-test' },
+        messages: [{ role: 'user', content: 'cancel me' }],
+      },
+    }),
+  })
+  await request(`/jobs/${slowJob.id}/cancel`, { method: 'POST' })
+  let cancelledJob = await request(`/jobs/${slowJob.id}`)
+  for (let attempt = 0; attempt < 50 && cancelledJob.status !== 'cancelled'; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    cancelledJob = await request(`/jobs/${slowJob.id}`)
+  }
+  assert.equal(cancelledJob.status, 'cancelled')
+
   const models = await request('/ai/models', {
     method: 'POST',
     body: JSON.stringify({
@@ -240,6 +309,9 @@ try {
     '/unavailable/chat/completions',
   ])
   assert.ok(mockAIRequests.every((item) => item.authorization === 'Bearer smoke-key'))
+  const logs = await request('/logs')
+  assert.ok(!JSON.stringify(logs).includes('smoke-key'))
+  assert.ok(!JSON.stringify(logs).includes('must-not-log'))
 
   console.log(JSON.stringify({
     ok: true,

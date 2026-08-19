@@ -1,60 +1,41 @@
 /** 代码生成页 — 基于硬件方案生成模块化工程代码，支持自检验证 */
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
-import { useAIConfigStore } from '@/store/aiConfigStore'
-import { useChipStore } from '@/store/chipStore'
 import { useThemeStore } from '@/store/themeStore'
-import { runCodegen } from '@/services/ai/codegen'
+import { startGeneration, cancelGeneration } from '@/services/ai/generationCoordinator'
+import GenerationProgress from '@/components/generation/GenerationProgress'
+import { useGenerationStore } from '@/store/generationStore'
 import FileTree from '@/components/codegen/FileTree'
 import CodePreview from '@/components/codegen/CodePreview'
 import ExportButtons from '@/components/codegen/ExportButtons'
-import { Loader2, Code2, AlertCircle, AlertTriangle, Sparkles, Cpu, Square } from 'lucide-react'
+import { Code2, AlertCircle, AlertTriangle, Sparkles, Cpu, Square } from 'lucide-react'
 import { matchDriverTemplates, DRIVER_TEMPLATES } from '@/data/driverTemplates'
 import { cn } from '@/lib/utils'
 
 export default function CodegenPage() {
   const navigate = useNavigate()
   const project = useProjectStore(selectCurrentProject)
-  const { setCodeFiles, setGenerating, isGeneratingCode } = useProjectStore()
-  const { getActive } = useAIConfigStore()
-  const { getSpec } = useChipStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
 
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
-  const generationController = useRef<AbortController | null>(null)
+  const generation = useGenerationStore()
+  const isGeneratingCode = generation.status === 'running' && generation.projectId === project?.id && (generation.mode === 'code-only' || generation.mode === 'full-generation')
 
-  useEffect(() => () => generationController.current?.abort(), [])
-
-  /** 生成代码 + 后台自检一致性 */
   async function handleGenerate() {
-    if (!project?.scheme) return
-    const svc = getActive()
-    if (!svc) { setError('请先在设置页配置并选择 AI 服务'); return }
+    if (!project) { navigate('/design/requirements'); return }
+    if (!project.scheme) { navigate('/design/requirements'); return }
+    if (isGeneratingCode) { cancelGeneration(); return }
     setError('')
     setWarning('')
-    setGenerating('code', true)
-    const controller = new AbortController()
-    generationController.current?.abort()
-    generationController.current = controller
     try {
-      const chipSpec = getSpec(project.target) ?? undefined
-      const result = await runCodegen(svc, project, chipSpec, { signal: controller.signal })
-      setCodeFiles(result.files)
-      if (result.warning) setWarning(result.warning)
+      await startGeneration({ mode: 'code-only', projectId: project.id })
     } catch (e: any) {
-      setError(e.message)
-    } finally {
-      if (generationController.current === controller) generationController.current = null
-      setGenerating('code', false)
+      setError(String(e?.message ?? e))
     }
-  }
-
-  function handleCancelGeneration() {
-    generationController.current?.abort()
   }
 
   if (!project) {
@@ -69,9 +50,9 @@ export default function CodegenPage() {
         )}>
           <Code2 size={28} className={isDark ? 'opacity-30' : 'opacity-40'} />
         </div>
-        <p className="text-sm">请先在需求页生成硬件方案</p>
+        <p className="text-sm">请先完成需求并生成硬件方案</p>
         <button
-          onClick={() => navigate('/requirement')}
+          onClick={() => navigate('/design/requirements')}
           className="text-sm text-indigo-400 hover:text-indigo-300 font-medium hover:underline"
         >
           前往需求页 →
@@ -149,9 +130,13 @@ export default function CodegenPage() {
               <span className="truncate" title={warning}>AI 自检发现潜在问题</span>
             </div>
           )}
-          {project.codeFiles.length === 0 ? (
+          {!project.scheme ? (
+            <button type="button" onClick={() => navigate('/design/requirements')} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500">
+              <Sparkles size={14} /> 去生成方案
+            </button>
+          ) : project.codeFiles.length === 0 ? (
             <button
-              onClick={isGeneratingCode ? handleCancelGeneration : handleGenerate}
+              onClick={handleGenerate}
               className={cn(
                 'flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-xl transition-all',
                 isGeneratingCode
@@ -168,22 +153,7 @@ export default function CodegenPage() {
         </div>
       </div>
 
-      {/* 加载 */}
-      {isGeneratingCode && (
-        <div className={cn(
-          'flex flex-col items-center justify-center py-12 gap-4',
-          isDark ? 'text-slate-400' : 'text-slate-500'
-        )}>
-          <Loader2 size={28} className="animate-spin text-indigo-400" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-indigo-400 mb-1">AI 正在生成模块化代码</p>
-            <p className="text-xs">解析硬件方案，构建模块化工程...</p>
-          </div>
-          <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full progress-bar" />
-          </div>
-        </div>
-      )}
+      <div className="px-5 pt-4"><GenerationProgress projectId={project.id} /></div>
 
       {/* 主体 */}
       {!isGeneratingCode && project.codeFiles.length > 0 && (
@@ -193,7 +163,7 @@ export default function CodegenPage() {
         </div>
       )}
 
-      {!isGeneratingCode && project.codeFiles.length === 0 && (
+      {!isGeneratingCode && project.scheme && project.codeFiles.length === 0 && (
         <div className={cn(
           'flex flex-col items-center justify-center flex-1 gap-3',
           isDark ? 'text-slate-500' : 'text-slate-400'
@@ -204,7 +174,7 @@ export default function CodegenPage() {
           )}>
             <Code2 size={28} className={isDark ? 'text-slate-600' : 'text-indigo-300'} />
           </div>
-          <p className="text-sm">点击上方「生成代码」开始构建工程</p>
+          <p className="text-sm">完成硬件方案后，点击上方「生成代码」开始构建工程</p>
         </div>
       )}
     </div>

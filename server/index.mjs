@@ -2,11 +2,13 @@ import http from 'node:http'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { CONFIG_PATH, HOST, LIMITS, PACKAGE_META, PORT } from './config.mjs'
 import { corsHeaders, ensureLocalOrigin, json, readBody } from './lib/http.mjs'
 import { normalizeForCompare, resolveExistingInsideWorkspace, toWorkspaceRelative } from './security/workspace-paths.mjs'
 import { createOpenAICompatibleAdapter } from './services/ai-provider.mjs'
+import { AgentError, AgentEventBus, JobManager, ServiceRegistry, SessionStore, ToolRegistry, createDefaultPluginRegistry, errorPayload, redactSensitive } from './agent/index.mjs'
 
 const {
   readBytes: MAX_READ_BYTES,
@@ -19,6 +21,12 @@ const {
 
 let workspaceRoot = ''
 const operationLog = []
+const eventBus = new AgentEventBus()
+const sessionStore = new SessionStore(undefined, eventBus)
+const pluginRegistry = createDefaultPluginRegistry()
+const serviceRegistry = new ServiceRegistry()
+const toolRegistry = new ToolRegistry(eventBus)
+const operationLogPath = path.join(sessionStore.root, 'operations.jsonl')
 
 const SKIP_DIRS = new Set([
   '.git',
@@ -34,6 +42,19 @@ const SKIP_DIRS = new Set([
   '.pio',
   '.metacore-backups',
   'coverage',
+  'docs',
+  'documentation',
+  'examples',
+  'example',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  'fixture',
+  'templates',
+  'template',
+  'prompts',
+  'prompt',
 ])
 
 const TEXT_EXTS = new Set([
@@ -154,17 +175,24 @@ async function saveConfig() {
 }
 
 function recordOperation(type, detail = {}, status = 'success') {
-  operationLog.unshift({
+  const entry = redactSensitive({
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     type,
     status,
     detail,
     createdAt: Date.now(),
   })
+  operationLog.unshift(entry)
   if (operationLog.length > 120) operationLog.length = 120
+  fs.mkdir(sessionStore.root, { recursive: true })
+    .then(() => fs.appendFile(operationLogPath, `${JSON.stringify(entry)}\n`, 'utf8'))
+    .catch(() => {})
 }
 
 const aiProvider = createOpenAICompatibleAdapter({ recordOperation })
+serviceRegistry.define({ id: 'ai', version: '1.0.0', request: 'messages', result: 'content+usage' })
+serviceRegistry.provide('ai', 'default', aiProvider)
+const jobManager = new JobManager({ eventBus, sessions: sessionStore, concurrency: 2 })
 
 async function commandAvailable(command) {
   const lookup = process.platform === 'win32' ? 'where.exe' : 'which'
@@ -190,6 +218,27 @@ async function getSystemInfo() {
     memoryGB: Number((os.totalmem() / 1024 / 1024 / 1024).toFixed(1)),
     tools,
   }
+}
+
+async function commandWorks(command, args = []) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { windowsHide: true, stdio: 'ignore', shell: false })
+    child.on('error', () => resolve(false))
+    child.on('close', (code) => resolve(code === 0))
+  })
+}
+
+async function resolveBuildInvocation(profile) {
+  if (await commandAvailable(profile.command)) {
+    return { command: profile.command, args: profile.args, display: [profile.command, ...profile.args].join(' ') }
+  }
+  // Windows Python installs often keep pio.exe outside PATH. Only allow the
+  // fixed PlatformIO module fallback; user-provided commands never reach this path.
+  if (profile.id === 'platformio' && await commandWorks('py', ['-m', 'platformio', '--version'])) {
+    const args = ['-m', 'platformio', ...profile.args]
+    return { command: 'py', args, display: ['py', ...args].join(' ') }
+  }
+  return null
 }
 
 function requireWorkspace() {
@@ -435,7 +484,7 @@ async function walk(dir, options = {}, state = { files: [], totalFiles: 0 }) {
     const full = path.join(dir, entry.name)
     if (entry.isSymbolicLink()) continue
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) {
+      if (!SKIP_DIRS.has(entry.name.toLowerCase())) {
         await walk(full, { depth: depth + 1 }, state)
       }
       continue
@@ -649,17 +698,20 @@ async function detectBuildProfiles() {
       markerExists = false
     }
     if (!markerExists) continue
+    const invocation = await resolveBuildInvocation(profile)
     profiles.push({
       id: profile.id,
       label: profile.label,
-      command: [profile.command, ...profile.args].join(' '),
-      available: await commandAvailable(profile.command),
+      command: invocation?.display ?? [profile.command, ...profile.args].join(' '),
+      available: Boolean(invocation),
+      marker: profile.marker,
+      unavailableReason: invocation ? undefined : `未检测到本机工具：${profile.command}`,
     })
   }
   return { profiles }
 }
 
-async function runBuildProfile(profileId) {
+async function runBuildProfile(profileId, { signal } = {}) {
   const profile = BUILD_PROFILES[profileId]
   if (!profile) {
     const err = new Error('不允许执行该构建命令')
@@ -674,15 +726,17 @@ async function runBuildProfile(profileId) {
     err.status = 400
     throw err
   }
-  if (!(await commandAvailable(profile.command))) {
+  const invocation = await resolveBuildInvocation(profile)
+  if (!invocation) {
     const err = new Error(`未检测到本机工具：${profile.command}`)
     err.status = 400
+    err.code = 'BUILD_TOOL_UNAVAILABLE'
     throw err
   }
 
   const startedAt = Date.now()
   return new Promise((resolve, reject) => {
-    const child = spawn(profile.command, profile.args, {
+    const child = spawn(invocation.command, invocation.args, {
       cwd: root,
       windowsHide: true,
       shell: false,
@@ -705,6 +759,9 @@ async function runBuildProfile(profileId) {
     child.stderr.on('data', (chunk) => append('stderr', chunk))
     child.on('error', (error) => reject(error))
 
+    const abortBuild = () => child.kill()
+    signal?.addEventListener('abort', abortBuild, { once: true })
+
     const timer = setTimeout(() => {
       timedOut = true
       child.kill()
@@ -712,11 +769,12 @@ async function runBuildProfile(profileId) {
 
     child.on('close', (exitCode) => {
       clearTimeout(timer)
+      signal?.removeEventListener('abort', abortBuild)
       const result = {
         profileId,
-        command: [profile.command, ...profile.args].join(' '),
+        command: invocation.display,
         exitCode: exitCode ?? -1,
-        success: !timedOut && exitCode === 0,
+        success: !timedOut && !signal?.aborted && exitCode === 0,
         timedOut,
         durationMs: Date.now() - startedAt,
         stdout: stdout.slice(0, MAX_BUILD_OUTPUT),
@@ -728,6 +786,13 @@ async function runBuildProfile(profileId) {
         exitCode: result.exitCode,
         durationMs: result.durationMs,
       }, result.success ? 'success' : 'failed')
+      if (signal?.aborted) {
+        const error = new Error('构建任务已取消')
+        error.code = 'BUILD_CANCELLED'
+        error.status = 409
+        reject(error)
+        return
+      }
       resolve(result)
     })
   })
@@ -1050,9 +1115,145 @@ async function setWorkspace(root) {
   return { workspaceRoot }
 }
 
+function requireAIMessages(args = {}, taskType = 'agent-tool') {
+  if (!args?.service || !Array.isArray(args.messages) || !args.messages.length) {
+    throw new AgentError('TOOL_INPUT_REQUIRED', `${taskType} 工具需要 service 和 messages`, { status: 400 })
+  }
+  return args
+}
+
+function validatePinAssignments(pins = []) {
+  if (!Array.isArray(pins)) throw new AgentError('TOOL_INPUT_INVALID', 'pins 必须是数组', { status: 400 })
+  const seen = new Map()
+  const conflicts = []
+  for (const item of pins) {
+    const pin = Number(item?.pin)
+    const name = String(item?.name ?? item?.signal ?? '').trim()
+    if (!Number.isInteger(pin) || pin < 0 || pin > 255 || !name) continue
+    const previous = seen.get(pin)
+    if (previous) conflicts.push({ pin, signals: [previous, name] })
+    else seen.set(pin, name)
+  }
+  return { valid: conflicts.length === 0, conflicts, checked: pins.length }
+}
+
+function validateCodeConsistency(args = {}) {
+  const expectedPins = Array.isArray(args.expectedPins) ? args.expectedPins : []
+  const source = String(args.code ?? '')
+  const missing = expectedPins
+    .filter((item) => item?.name && Number.isInteger(Number(item.pin)))
+    .filter((item) => !new RegExp(`\\b${String(item.name).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(source) && !source.includes(String(item.pin)))
+    .map((item) => ({ name: item.name, pin: Number(item.pin) }))
+  return { valid: missing.length === 0, missing, checked: expectedPins.length }
+}
+
+async function exportProject({ format = 'markdown', outputPath = '.metacore-exports/report.md' } = {}) {
+  if (format !== 'markdown') {
+    throw new AgentError('EXPORT_FORMAT_UNSUPPORTED', '当前本地服务仅支持 Markdown 导出', { status: 415 })
+  }
+  const root = requireWorkspace()
+  const target = await resolveInsideWorkspace(outputPath)
+  const relative = toRelative(target)
+  if (!relative.startsWith('.metacore-exports/')) {
+    throw new AgentError('EXPORT_PATH_INVALID', '导出文件必须位于 .metacore-exports 目录', { status: 403 })
+  }
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  const analysis = await analyzeWorkspace()
+  const content = generateMarkdownReport(analysis)
+  await fs.writeFile(target, content, 'utf8')
+  recordOperation('project.export', { format, path: relative, size: Buffer.byteLength(content, 'utf8') })
+  return { format, path: relative, size: Buffer.byteLength(content, 'utf8'), workspaceRoot: root }
+}
+
+function registerAgentTools() {
+  const readPermission = { read: true, write: false, build: false, export: false, requiresApproval: false }
+  toolRegistry.register({ name: 'inspect_project', description: '扫描当前授权工作区', permissions: readPermission, execute: () => analyzeWorkspace() })
+  toolRegistry.register({ name: 'read_file', description: '读取当前授权工作区中的文本文件', permissions: readPermission, execute: ({ path: filePath }) => readFile(filePath) })
+  toolRegistry.register({ name: 'search_files', description: '在当前授权工作区搜索文本', permissions: readPermission, execute: ({ query, maxResults }) => searchFiles(query, maxResults) })
+  toolRegistry.register({ name: 'run_local_analysis', description: '执行本地工程静态分析', permissions: readPermission, execute: () => analyzeWorkspace() })
+  toolRegistry.register({ name: 'run_build', description: '执行白名单构建配置', permissions: { ...readPermission, build: true, requiresApproval: true }, execute: ({ profileId }) => runBuildProfile(profileId) })
+  toolRegistry.register({ name: 'write_file', description: '在批准后安全写入文本文件', permissions: { ...readPermission, write: true, requiresApproval: true }, execute: ({ path: filePath, content, expectedModifiedAt }) => writeFileSafely(filePath, content, expectedModifiedAt) })
+  toolRegistry.register({ name: 'create_backup', description: '为工作区文件创建可恢复备份', permissions: { ...readPermission, write: true, requiresApproval: true }, execute: async ({ path: filePath }) => createBackup(await resolveInsideWorkspace(filePath), 'agent-backup') })
+  toolRegistry.register({ name: 'restore_backup', description: '在批准后恢复备份', permissions: { ...readPermission, write: true, requiresApproval: true }, execute: ({ backupId }) => restoreBackup(backupId) })
+  const aiPermission = { ...readPermission }
+  toolRegistry.register({ name: 'propose_hardware_scheme', description: '生成结构化硬件方案', permissions: aiPermission, execute: (args, context) => { const input = requireAIMessages(args, '硬件方案'); return aiProvider.call(input.service, input.messages, input.temperature, { signal: context.signal }) } })
+  toolRegistry.register({ name: 'validate_pin_assignment', description: '校验引脚分配冲突', permissions: aiPermission, execute: (args, context) => Array.isArray(args?.pins) ? validatePinAssignments(args.pins) : (() => { const input = requireAIMessages(args, '引脚校验'); return aiProvider.call(input.service, input.messages, input.temperature, { signal: context.signal }) })() })
+  toolRegistry.register({ name: 'generate_firmware', description: '生成结构化固件工程', permissions: aiPermission, execute: (args, context) => { const input = requireAIMessages(args, '固件生成'); return aiProvider.call(input.service, input.messages, input.temperature, { signal: context.signal }) } })
+  toolRegistry.register({ name: 'validate_code_consistency', description: '校验代码与硬件方案一致性', permissions: aiPermission, execute: (args, context) => Array.isArray(args?.expectedPins) ? validateCodeConsistency(args) : (() => { const input = requireAIMessages(args, '代码一致性'); return aiProvider.call(input.service, input.messages, input.temperature, { signal: context.signal }) })() })
+  toolRegistry.register({ name: 'generate_flow', description: '生成结构化执行流程图', permissions: aiPermission, execute: (args, context) => { const input = requireAIMessages(args, '流程图生成'); return aiProvider.call(input.service, input.messages, input.temperature, { signal: context.signal }) } })
+  toolRegistry.register({ name: 'export_project', description: '导出本地工程 Markdown 交付报告', permissions: { ...readPermission, export: true, requiresApproval: true }, execute: (args) => exportProject(args) })
+}
+
+function registerAgentJobs() {
+  jobManager.register('scheme-validation', async (payload, context) => {
+    await context.progress(20, '校验引脚唯一性和 GPIO 范围')
+    const result = validatePinAssignments(payload?.pins)
+    if (!result.valid) {
+      throw new AgentError('PIN_CONFLICT', `发现 ${result.conflicts.length} 个引脚冲突`, { status: 422, details: result })
+    }
+    await context.progress(100, '硬件引脚约束通过')
+    return result
+  })
+  jobManager.register('local-analysis', async (payload, context) => {
+    void payload
+    await context.progress(20, '扫描工作区文件')
+    const result = await analyzeWorkspace()
+    await context.progress(100, '静态分析完成')
+    return result
+  })
+  jobManager.register('build', async (payload, context) => {
+    await context.progress(10, '检查白名单构建配置')
+    const result = await runBuildProfile(payload.profileId, { signal: context.signal })
+    await context.progress(100, result.success ? '构建通过' : '构建失败')
+    return result
+  })
+  jobManager.register('ai', async (payload, context) => {
+    await context.progress(10, '请求 AI 服务')
+    const result = await aiProvider.call(payload.service, payload.messages, payload.temperature, { signal: context.signal })
+    await context.progress(100, 'AI 响应完成')
+    return result
+  })
+  for (const stage of ['requirements', 'clarification', 'scheme-generation', 'code-generation', 'code-validation', 'flow-generation', 'release-check']) {
+    jobManager.register(stage, async (payload, context) => {
+      if (!payload?.service || !Array.isArray(payload.messages) || !payload.messages.length) {
+        throw new AgentError('JOB_INPUT_REQUIRED', `${stage} 需要有效的 AI service 和 messages，不能跳过执行`, { status: 400 })
+      }
+      await context.progress(10, `执行 ${stage}`)
+      const result = await aiProvider.call(payload.service, payload.messages, payload.temperature, { signal: context.signal, taskType: payload.taskType })
+      await context.progress(100, `${stage} 完成`)
+      return result
+    })
+  }
+}
+
+function sseHeaders() {
+  return {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  }
+}
+
+function streamEvents(req, res, channel, getCurrent, origin) {
+  const afterId = Number(req.headers['last-event-id'] ?? new URL(req.url ?? '/', `http://${HOST}:${PORT}`).searchParams.get('after') ?? 0)
+  res.writeHead(200, { ...sseHeaders(), ...corsHeaders(origin) })
+  for (const event of getCurrent(afterId)) res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+  const unsubscribe = eventBus.subscribe(channel, (event) => {
+    res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+  })
+  const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 15_000)
+  req.on('close', () => { clearInterval(heartbeat); unsubscribe() })
+}
+
+registerAgentTools()
+registerAgentJobs()
+
 async function route(req, res) {
   const origin = req.headers.origin ?? ''
   ensureLocalOrigin(req)
+  const requestId = req.headers['x-request-id'] || crypto.randomUUID()
+  res.setHeader('X-Request-ID', requestId)
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, corsHeaders(origin))
@@ -1061,8 +1262,87 @@ async function route(req, res) {
   }
 
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
+  if (req.method === 'GET' && url.pathname === '/api/sessions') {
+    json(res, 200, { sessions: await sessionStore.list({ projectId: url.searchParams.get('projectId') ?? undefined, status: url.searchParams.get('status') ?? undefined }) }, origin)
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/api/sessions') {
+    const body = await readBody(req)
+    json(res, 201, await sessionStore.create(body.projectId, body.metadata), origin)
+    return
+  }
+  if (req.method === 'GET' && /^\/api\/sessions\/[^/]+$/.test(url.pathname)) {
+    const session = await sessionStore.get(url.pathname.split('/').pop())
+    if (!session) { json(res, 404, { error: '会话不存在', code: 'SESSION_NOT_FOUND', requestId }, origin); return }
+    json(res, 200, session, origin)
+    return
+  }
+  if (req.method === 'GET' && /^\/api\/sessions\/[^/]+\/events$/.test(url.pathname)) {
+    const sessionId = url.pathname.split('/')[3]
+    if (!await sessionStore.get(sessionId)) { json(res, 404, { error: '会话不存在', code: 'SESSION_NOT_FOUND', requestId }, origin); return }
+    streamEvents(req, res, `session:${sessionId}`, (afterId) => eventBus.getEvents(`session:${sessionId}`, afterId), origin)
+    return
+  }
+  if (req.method === 'GET' && url.pathname === '/api/jobs') {
+    json(res, 200, { jobs: jobManager.list({ projectId: url.searchParams.get('projectId') ?? undefined, sessionId: url.searchParams.get('sessionId') ?? undefined, status: url.searchParams.get('status') ?? undefined }) }, origin)
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/api/jobs') {
+    const body = await readBody(req)
+    const session = body.sessionId ? await sessionStore.get(body.sessionId) : await sessionStore.create(body.projectId, { source: 'job' })
+    if (!session) { json(res, 404, { error: '会话不存在', code: 'SESSION_NOT_FOUND', requestId }, origin); return }
+    const job = await jobManager.create({ projectId: body.projectId ?? session.projectId, stage: body.stage, sessionId: session.id, payload: body.payload ?? {} })
+    json(res, 202, job, origin)
+    return
+  }
+  if (req.method === 'GET' && /^\/api\/jobs\/[^/]+$/.test(url.pathname)) {
+    const job = jobManager.get(url.pathname.split('/').pop())
+    if (!job) { json(res, 404, { error: '任务不存在', code: 'JOB_NOT_FOUND', requestId }, origin); return }
+    json(res, 200, job, origin)
+    return
+  }
+  if (req.method === 'GET' && /^\/api\/jobs\/[^/]+\/events$/.test(url.pathname)) {
+    const jobId = url.pathname.split('/')[3]
+    if (!jobManager.get(jobId)) { json(res, 404, { error: '任务不存在', code: 'JOB_NOT_FOUND', requestId }, origin); return }
+    streamEvents(req, res, `job:${jobId}`, (afterId) => jobManager.events(jobId, afterId), origin)
+    return
+  }
+  if (req.method === 'POST' && /^\/api\/jobs\/[^/]+\/(cancel|retry)$/.test(url.pathname)) {
+    const jobId = url.pathname.split('/')[3]
+    const action = url.pathname.split('/')[4]
+    const job = action === 'cancel' ? await jobManager.cancel(jobId) : await jobManager.retry(jobId)
+    json(res, 200, job, origin)
+    return
+  }
+  if (req.method === 'GET' && url.pathname === '/api/agent/plugins') {
+    json(res, 200, { plugins: pluginRegistry.list(), services: serviceRegistry.list(), tools: toolRegistry.list() }, origin)
+    return
+  }
+  if (req.method === 'POST' && /^\/api\/agent\/tools\/[^/]+$/.test(url.pathname)) {
+    const toolName = decodeURIComponent(url.pathname.split('/').pop())
+    const body = await readBody(req)
+    const registered = toolRegistry.list().find((tool) => tool.name === toolName)
+    if (!registered) { json(res, 404, { error: '工具不存在', code: 'TOOL_NOT_FOUND', requestId }, origin); return }
+    const approved = body.approved === true
+    const permissions = registered.permissions ?? {}
+    if ((permissions.requiresApproval || permissions.write || permissions.build || permissions.export) && !approved) {
+      json(res, 428, { error: '该工具需要用户批准后执行', code: 'TOOL_APPROVAL_REQUIRED', requestId, details: { tool: toolName } }, origin)
+      return
+    }
+    const result = await toolRegistry.execute(toolName, body.args ?? body, {
+      requestId,
+      sessionId: body.sessionId,
+      jobId: body.jobId,
+      approved,
+      allowWrite: approved,
+      allowBuild: approved,
+      allowExport: approved,
+    })
+    json(res, 200, { result }, origin)
+    return
+  }
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    json(res, 200, { ok: true, service: 'metacore-studio-local', version: PACKAGE_META.version, workspaceRoot, port: PORT }, origin)
+    json(res, 200, { ok: true, service: 'metacore-studio-local', version: PACKAGE_META.version, workspaceRoot, port: PORT, agentRuntime: process.env.METACORE_AGENT_RUNTIME ?? 'internal' }, origin)
     return
   }
 
@@ -1154,16 +1434,30 @@ async function route(req, res) {
     return
   }
 
-  json(res, 404, { error: '接口不存在' }, origin)
+  json(res, 404, { error: '接口不存在', code: 'ROUTE_NOT_FOUND', requestId }, origin)
 }
 
+async function loadPersistedOperationLog() {
+  try {
+    const lines = (await fs.readFile(operationLogPath, 'utf8')).trim().split(/\r?\n/).slice(-120)
+    operationLog.push(...lines.reverse().map((line) => JSON.parse(line)))
+  } catch { /* first start or a partially written historical log */ }
+}
+
+await sessionStore.init()
+await loadPersistedOperationLog()
+sessionStore.cleanup().catch(() => {})
 await loadConfig()
 
 const server = http.createServer((req, res) => {
+  const startedAt = Date.now()
   route(req, res).catch((err) => {
     const origin = req.headers.origin ?? ''
     const status = err.status || 500
-    json(res, status, { error: err.message || '本地服务异常' }, origin)
+    const requestId = String(res.getHeader('X-Request-ID') ?? crypto.randomUUID())
+    const payload = errorPayload(err, requestId)
+    recordOperation('http.error', { method: req.method, path: req.url, durationMs: Date.now() - startedAt, code: payload.code }, 'failed')
+    json(res, status, { error: payload.message, ...payload }, origin)
   })
 })
 

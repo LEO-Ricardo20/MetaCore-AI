@@ -14,6 +14,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:local": "node server/smoke-test.mjs",
+    "test:e2e": "node scripts/browser-smoke.mjs",
+    "test:e2e:real": "node scripts/real-project-smoke.mjs",
+    "verify:delivery": "node scripts/verify-delivery.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run test:local && npm run build",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview"

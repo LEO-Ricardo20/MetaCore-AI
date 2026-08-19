@@ -590,6 +590,8 @@ export default function LocalWorkspacePage() {
                 <button
                   onClick={handleSearch}
                   disabled={loading === 'search' || !searchText.trim()}
+                  title="搜索工作区"
+                  aria-label="搜索工作区"
                   className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center',
                     isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100'

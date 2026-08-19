@@ -15,10 +15,10 @@
 [![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-Studio?label=version&color=16a34a)](#版本状态)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#许可证)
 
-MetaCore Studio 将自然语言硬件需求转化为结构化的嵌入式开发流程：
+MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中心的嵌入式研发流程：
 
 ```text
-需求描述 -> 硬件方案 -> 引脚/BOM/接线 -> 固件代码 -> 流程图 -> 本地诊断 -> 导出
+项目创建 -> 需求澄清 -> 硬件设计 -> 固件实现 -> 一致性验证 -> 本地诊断 -> 构建验证 -> 发布检查 -> 导出
 ```
 
 浏览器应用负责产品界面和 AI 工作流；localhost 服务负责 AI 代理、本地工作区分析、安全文件操作、备份和构建验证。
@@ -26,6 +26,7 @@ MetaCore Studio 将自然语言硬件需求转化为结构化的嵌入式开发�
 ## 目录
 
 - [功能亮点](#功能亮点)
+- [产品工作流](#产品工作流)
 - [系统架构](#系统架构)
 - [版本状态](#版本状态)
 - [赞助支持](#赞助支持)
@@ -33,6 +34,7 @@ MetaCore Studio 将自然语言硬件需求转化为结构化的嵌入式开发�
 - [快速开始](#快速开始)
 - [本地工程模式](#本地工程模式)
 - [AI 服务](#ai-服务)
+- [后台任务与 Agent Runtime](#后台任务与-agent-runtime)
 - [典型使用流程](#典型使用流程)
 - [示例工程](#示例工程)
 - [常用命令](#常用命令)
@@ -62,6 +64,22 @@ MetaCore Studio 将自然语言硬件需求转化为结构化的嵌入式开发�
 | 构建验证 | 检测并运行白名单内的 PlatformIO、ESP-IDF 和 CMake 构建 |
 | 项目导出 | 导出 ZIP 固件工程和格式化 PDF 设计文档 |
 | 项目迁移 | 导入、导出经过校验的 `.metacore.json` 项目归档，不包含 API Key |
+| 项目生命周期 | 统一的阶段、产物 freshness、版本、运行记录、取消和重试 |
+| Agent Runtime | localhost Job、SSE 事件、Session trajectory、工具权限和审批策略 |
+
+## 产品工作流
+
+应用打开后进入 `/workspace` 工作台，研发流程收敛为五个一级板块：
+
+1. `工作台`：查看当前项目、阶段、产物状态、连接状态和下一步动作。
+2. `设计`：需求、芯片、外设、方案、引脚、BOM、接线和设计审查。
+3. `实现`：固件生成、文件树、Monaco、代码状态、版本和导出。
+4. `验证`：一致性、流程图、本地分析、构建、安全和发布检查。
+5. `项目`：项目切换、导入、导出和删除。
+
+当前项目使用 Project Schema v2 和明确的 `ProjectStage`。需求、方案、引脚、代码、流程、本地分析、构建和发布检查都作为带版本的 Artifact 保存；上游变化会把下游结果标为 `stale`，过期结果不能继续显示为已通过。
+
+完整状态机、stale 传播规则和恢复行为见 [`docs/PRODUCT_WORKFLOW.md`](docs/PRODUCT_WORKFLOW.md)。
 
 ## 系统架构
 
@@ -190,15 +208,38 @@ npm run dev
 
 不要在共享浏览器配置中保存正式凭据。交接电脑前应清除网站数据，不要把真实 Key 放进源码、截图、Issue、日志或导出配置。
 
+## 后台任务与 Agent Runtime
+
+localhost 服务默认使用 `METACORE_AGENT_RUNTIME=internal`。该运行时是 MetaCore Studio 内部的 Harness-inspired 实现，提供静态 Plugin Registry、Service Provider、Tool Policy、Job 队列、取消、重试、SSE 事件和独立 Session trajectory。
+
+可用接口包括：
+
+```text
+POST /api/sessions
+GET  /api/sessions/:id
+GET  /api/sessions/:id/events
+POST /api/jobs
+GET  /api/jobs/:id
+GET  /api/jobs/:id/events
+POST /api/jobs/:id/cancel
+POST /api/jobs/:id/retry
+GET  /api/agent/plugins
+```
+
+Job 默认最多并发 2 个，Session 和操作日志默认写入操作系统用户数据目录，不写入工程目录。写文件、恢复备份和构建仍需要服务端权限、工作区检查、备份、修改时间冲突检查和白名单约束。
+
+当前没有实际 DeepSeek Harness adapter。`METACORE_AGENT_RUNTIME=deepseek-harness` 只是未来适配方向，不能当作已经接入的运行时。详细边界见 [`docs/AGENT_ARCHITECTURE.md`](docs/AGENT_ARCHITECTURE.md) 和 [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md)。
+
 ## 典型使用流程
 
 1. 打开`设置`，配置并测试 AI 服务。
-2. 打开`方案`，输入硬件需求，选择目标芯片和工程格式。
-3. 生成硬件方案，检查引脚图、BOM 和接线表。
-4. 生成固件代码，并运行 AI 一致性检查。
-5. 打开`流程`，查看生成的执行流程图。
-6. 导出 ZIP 工程或 PDF 设计文档。
-7. 可选：打开`本地`页面，选择已有嵌入式工程并生成诊断报告。
+2. 从`工作台`进入`设计/需求`，填写硬件需求、目标芯片和工程格式。
+3. 生成硬件方案，检查引脚图、BOM、接线、电源约束和风险。
+4. 在`实现`中生成固件代码，确认方案版本、代码状态和一致性结果。
+5. 在`验证`中查看流程图，运行本地工程分析和白名单构建。
+6. 处理 stale、警告和阻塞错误，执行发布前检查。
+7. 导出 ZIP 工程、PDF 设计文档或 `.metacore.json` 项目归档。
+8. 可选：在`项目`中切换、导入、另存为新版本或删除项目。
 
 ## 示例工程
 
@@ -207,6 +248,8 @@ npm run dev
 [`examples/esp32-smart-environment`](examples/esp32-smart-environment/)
 
 示例包含 ESP32、Wi-Fi、MQTT、DHT22、SSD1306、I2C、GPIO、依赖识别和 PlatformIO 构建检测。连接真实硬件前，请替换示例网络配置。
+
+真实工程浏览器 smoke 会打开验证工作区、点击“扫描”，并确认 PlatformIO、ESP32、Wi-Fi、MQTT、SSD1306、DHT、I2C、UART 和真实 GPIO 证据能够显示。PlatformIO 工具链缺失或下载失败时，真实固件构建必须保持 blocked/failed，不能被描述为成功。
 
 ## 常用命令
 
@@ -220,6 +263,9 @@ npm run dev
 | `npm run build` | 运行 TypeScript 检查并构建生产版本 |
 | `npm run preview` | 使用 Vite 预览生产构建 |
 | `npm run test:local` | 运行本地服务冒烟测试 |
+| `npm run test:e2e` | 使用 Deterministic Mock Provider 验证生成、取消、重试和跨页面后台任务 |
+| `npm run test:e2e:real` | 在真实 ESP32 示例工程中验证浏览器扫描和硬件证据展示 |
+| `npm run verify:delivery` | 启动或复用本地服务，运行全部质量检查和两套浏览器 smoke |
 | `npm run check` | 依次运行代码规范、类型、单元测试、本地服务测试和构建 |
 
 ## 项目结构
@@ -233,16 +279,20 @@ src/
 ├── types/               # 硬件、项目和 AI 服务领域类型
 └── App.tsx              # HashRouter 路由
 server/
-├── index.mjs            # 本地服务组合入口、文件、分析、备份和构建
+├── index.mjs            # 本地服务组合入口、旧 API 兼容和路由
 ├── config.mjs           # 监听地址、限制和版本元数据
 ├── lib/http.mjs         # JSON、CORS、本机来源和请求体处理
 ├── security/            # 工作区真实路径安全边界
 ├── services/            # 可替换的 AI 服务商适配器
+├── agent/               # Internal Agent Runtime、Job、Session、Tool 和事件
 └── smoke-test.mjs       # 独立本地 API 冒烟测试
 docs/
 ├── ARCHITECTURE.md      # 模块边界与依赖方向
-├── LOCAL_API.md         # 本地服务 API 文档
-└── PROJECT_FILES.md     # 项目归档格式与安全限制
+├── PRODUCT_WORKFLOW.md  # 项目生命周期、阶段和 stale 规则
+├── AGENT_ARCHITECTURE.md# Agent Runtime、Job、Session 和 Contract
+├── SECURITY_MODEL.md    # localhost、工作区和凭据安全边界
+├── LOCAL_API.md         # 本地服务 API、Job 和 SSE
+└── PROJECT_FILES.md     # Project Schema v2 与归档兼容性
 examples/
 └── esp32-smart-environment/  # PlatformIO 分析示例
 public/
@@ -257,6 +307,8 @@ public/
 ```
 
 ## 安全边界
+
+完整威胁模型、工作区授权、路径校验、Agent 权限和已知缺口见 [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md)。
 
 localhost 服务面向本地开发流程，不是通用远程文件服务器：
 
@@ -281,13 +333,17 @@ localhost 服务面向本地开发流程，不是通用远程文件服务器：
 
 ## 测试
 
-运行完整质量检查：
+运行完整交付检查：
 
 ```bash
-npm run check
+npm run verify:delivery
 ```
 
 单元测试会验证 AI 结果结构、项目单一状态、项目归档、流程图引用和生成文件路径安全；本地服务测试会创建临时 PlatformIO 风格工程，并验证工作区设置、目录读取、符号链接越界阻止、ESP32 和物联网协议识别、依赖提取、文件写入与备份、报告生成、构建配置检测、AI Chat Completions、Responses API、模型列表和上游错误处理。
+
+当前改造新增覆盖项目生命周期迁移、Artifact stale 传播、Pipeline 取消/重试、AI Task Contract repair、上下文选择、Session/Job/SSE 顺序和日志脱敏。
+
+`test:e2e` 使用明确标识的 Deterministic Mock Provider 验证 AI 编排状态机，不代表真实 DeepSeek 调用；`test:e2e:real` 使用仓库内 ESP32 工程验证真实本地分析页面。真实固件编译仍取决于本机 PlatformIO/ESP-IDF/CMake 工具链和依赖是否可用。
 
 提交改动前运行生产构建：
 
@@ -343,6 +399,12 @@ npm run dev:server
 - 生成的硬件设计和固件必须根据真实芯片手册和硬件进行复核。
 - 本项目不能替代电气安全评审、安全审计和硬件在环测试。
 - 大模型生成代码和复杂方案可能需要较长时间，具体取决于模型、服务商容量和输出规模。
+- 当前 Agent Runtime 是内部 Harness-inspired 实现，不是 DeepSeek Harness 的实际集成；`deepseek-harness` 适配器仍未启用。
+- Job 队列和 EventBus 仍在 localhost 进程内存中，服务重启后不会恢复 running Job 或重放历史 SSE；Session 元数据和 JSONL trajectory 会保留。
+- 当前没有 capability token、请求速率保护或同一工作区写操作锁；服务只适合单用户本机 loopback 使用。
+- 验证工作区的构建、安全和发布 Tab 当前以统一质量门禁面板呈现，完整的专用操作仍复用原本地工作区能力。
+- PDF renderer 和 PDF worker 仍会生成较大的异步 chunk，构建会提示体积警告；这不影响功能，但后续可继续拆分依赖。
+- `verify:delivery` 验证应用编排和真实工程扫描，但不会下载大型嵌入式工具链；若 PlatformIO 编译器或依赖未安装，构建门禁会明确失败或阻断，不能据此宣称固件已真实编译通过。
 
 ## 参与贡献
 

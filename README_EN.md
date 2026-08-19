@@ -195,6 +195,8 @@ The repository includes a small PlatformIO example for local analysis:
 
 It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, dependency detection, and PlatformIO build detection. Replace the example network settings before using it with real hardware.
 
+The real-workspace browser smoke opens the verification workspace, clicks Scan, and verifies that PlatformIO, ESP32, Wi-Fi, MQTT, SSD1306, DHT, I2C, UART, and source-backed GPIO evidence are displayed. If the PlatformIO toolchain is unavailable or cannot be downloaded, firmware compilation must remain blocked or failed and must not be reported as successful.
+
 ## Commands
 
 | Command | Purpose |
@@ -207,6 +209,9 @@ It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, depend
 | `npm run build` | Type-check and create a production frontend build |
 | `npm run preview` | Preview the production build with Vite |
 | `npm run test:local` | Run the local service smoke test |
+| `npm run test:e2e` | Verify generation, cancellation, retry, and background navigation with the deterministic mock provider |
+| `npm run test:e2e:real` | Verify browser-based analysis and hardware evidence for the real ESP32 example workspace |
+| `npm run verify:delivery` | Start or reuse local services and run all quality checks plus both browser smoke workflows |
 | `npm run check` | Run lint, type checks, unit tests, local smoke tests, and the production build |
 
 ## Project Structure
@@ -267,13 +272,15 @@ The local service is designed for a local development workflow, not as a general
 
 ## Testing
 
-Run the complete quality gate:
+Run the complete delivery gate:
 
 ```bash
-npm run check
+npm run verify:delivery
 ```
 
 Unit tests validate AI result structures, canonical project state, portable project archives, flow references, and generated-file path safety. The local service test creates a temporary PlatformIO-like project and verifies workspace setup, directory listing, linked-path escape protection, ESP32 and IoT protocol detection, dependency extraction, file writing with backup, report generation, build profile detection, AI proxy calls, model discovery, Responses API handling, and upstream error propagation.
+
+`test:e2e` uses an explicitly labeled deterministic mock provider to verify the AI orchestration state machine; it is not a real DeepSeek call. `test:e2e:real` uses the repository ESP32 project to verify the actual local-analysis UI. Real firmware compilation still depends on an available local PlatformIO, ESP-IDF, or CMake toolchain and its dependencies.
 
 Run the production build before submitting changes:
 

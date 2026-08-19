@@ -41,22 +41,36 @@
     --chat-user-bg: linear-gradient(135deg, #6366f1, #8b5cf6);
     --chat-assistant-bg: rgba(30, 41, 59, 0.9);
     --chat-assistant-border: rgba(99, 102, 241, 0.15);
+    --surface-base: #070a0f;
+    --surface-raised: rgba(18, 24, 34, 0.86);
+    --surface-glass: rgba(10, 15, 23, 0.82);
+    --surface-hover: rgba(42, 53, 70, 0.48);
+    --border-strong: rgba(148, 163, 184, 0.32);
+    --accent-info: #22d3ee;
+    --accent-success: #34d399;
+    --accent-warning: #fbbf24;
+    --accent-danger: #f87171;
+    --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.025);
+    --shadow-floating: 0 24px 64px rgba(0, 0, 0, 0.42), inset 0 1px rgba(255, 255, 255, 0.04);
+    --blur-panel: 18px;
+    --radius-panel: 8px;
+    --radius-control: 7px;
   }
 
   /* === 亮色主题 === */
   .light {
-    --bg-base: #f0f4ff;
-    --bg-card: rgba(255, 255, 255, 0.7);
-    --bg-card-hover: rgba(255, 255, 255, 0.85);
-    --bg-sidebar: #e8effe;
-    --bg-input: rgba(241, 245, 249, 0.9);
-    --border-subtle: rgba(99, 102, 241, 0.1);
-    --border-medium: rgba(99, 102, 241, 0.2);
-    --border-strong: rgba(99, 102, 241, 0.35);
-    --text-primary: #1e293b;
+    --bg-base: #f5faf9;
+    --bg-card: rgba(255, 255, 255, 0.86);
+    --bg-card-hover: rgba(255, 255, 255, 0.98);
+    --bg-sidebar: #edf7f5;
+    --bg-input: rgba(255, 255, 255, 0.94);
+    --border-subtle: rgba(20, 125, 112, 0.14);
+    --border-medium: rgba(20, 125, 112, 0.24);
+    --border-strong: rgba(20, 125, 112, 0.38);
+    --text-primary: #1f2937;
     --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --text-dim: #cbd5e1;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
     --accent-primary: #6366f1;
     --accent-cyan: #0891b2;
     --accent-green: #16a34a;
@@ -78,6 +92,20 @@
     --chat-user-bg: linear-gradient(135deg, #6366f1, #8b5cf6);
     --chat-assistant-bg: rgba(255, 255, 255, 0.9);
     --chat-assistant-border: rgba(99, 102, 241, 0.15);
+    --surface-base: #f7fbfa;
+    --surface-raised: rgba(255, 255, 255, 0.92);
+    --surface-glass: rgba(247, 250, 255, 0.9);
+    --surface-hover: rgba(219, 242, 237, 0.72);
+    --border-strong: rgba(71, 85, 105, 0.28);
+    --accent-info: #0284c7;
+    --accent-success: #15803d;
+    --accent-warning: #b45309;
+    --accent-danger: #b91c1c;
+    --shadow-panel: 0 14px 36px rgba(15, 23, 42, 0.09), inset 0 1px rgba(255, 255, 255, 0.85);
+    --shadow-floating: 0 24px 64px rgba(15, 23, 42, 0.16), inset 0 1px rgba(255, 255, 255, 0.9);
+    --blur-panel: 18px;
+    --radius-panel: 8px;
+    --radius-control: 7px;
   }
 
   body {
@@ -128,14 +156,95 @@
   background: var(--bg-card);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-card);
 }
 .glass-card:hover {
   border-color: var(--border-medium);
   box-shadow: var(--shadow-hover);
-  transform: translateY(-1px);
+}
+
+.surface-panel {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.nav-button {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-control);
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.nav-button:hover { background: var(--surface-hover); color: var(--text-primary); }
+.nav-button-active { background: rgba(79, 70, 229, 0.18); color: #a5b4fc; box-shadow: inset 2px 0 #22d3ee; }
+.light .nav-button-active { color: #3730a3; background: rgba(79, 70, 229, 0.1); }
+
+.icon-button {
+  display: inline-flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+}
+.icon-button:hover { background: var(--surface-hover); color: var(--text-primary); }
+
+.status-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stage-tabs {
+  display: flex;
+  min-height: 42px;
+  gap: 2px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.stage-tab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 2px solid transparent;
+  padding: 0 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.stage-tab:hover { color: var(--text-primary); background: var(--surface-hover); }
+.stage-tab-active { border-bottom-color: var(--accent-info); color: var(--text-primary); }
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-info);
+  outline-offset: 2px;
+}
+
+button:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: saturate(0.65);
 }
 
 /* === 渐变文字 === */
@@ -350,10 +459,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
 }
 
-/* === 白色主题：覆盖所有硬编码文字颜色 === */
+/* === 亮色主题：仅为旧页面提供受控兼容映射 === */
 .light {
-  /* 主文字：白→黑 */
-  color: #1e293b !important;
+  color: var(--text-primary);
 }
 .light h1,
 .light h2,
@@ -361,14 +469,22 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .light h4,
 .light h5,
 .light h6 {
-  color: #1e293b !important;
+  color: var(--text-primary);
 }
-.light span { color: inherit; }
-.light p { color: #475569; }
 .light code { color: #7c3aed; }
 
-/* Tailwind 文字颜色映射：暗色→亮色 */
-.light .text-white { color: #1e293b !important; }
+/* 语义色在深色主题中仍需保持足够亮度；浅色主题使用组件中的深色语义色。 */
+.dark .text-indigo-700 { color: #a5b4fc !important; }
+.dark .text-emerald-700 { color: #6ee7b7 !important; }
+.dark .text-amber-700 { color: #fcd34d !important; }
+.dark .text-red-700 { color: #fca5a5 !important; }
+.dark .text-orange-700 { color: #fdba74 !important; }
+.dark .text-yellow-700 { color: #fde68a !important; }
+.dark .text-blue-700 { color: #93c5fd !important; }
+.dark .text-purple-700 { color: #d8b4fe !important; }
+.dark .text-slate-700 { color: #cbd5e1 !important; }
+
+/* 旧页面的 slate 色阶映射。主按钮的 text-white 由组件自身控制。 */
 .light .text-slate-100 { color: #1e293b !important; }
 .light .text-slate-200 { color: #334155 !important; }
 .light .text-slate-300 { color: #475569 !important; }
@@ -421,3 +537,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   background: rgba(255,255,255,0.9) !important;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

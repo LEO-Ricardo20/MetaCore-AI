@@ -42,7 +42,7 @@ export const useAIConfigStore = create<AIConfigState>()(
         return services.find((s) => (
           s.id === activeServiceId
           && s.enabled
-          && (s.provider === 'ollama' || Boolean(s.apiKey.trim()))
+          && (s.provider === 'ollama' || s.provider === 'mock' || Boolean(s.apiKey.trim()))
         )) ?? null
       }
     }),

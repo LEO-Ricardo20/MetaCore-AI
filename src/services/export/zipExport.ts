@@ -1,11 +1,16 @@
 import JSZip from 'jszip'
-import type { CodeFile } from '@/types/project'
+import type { CodeFile, Project } from '@/types/project'
+import { createPortableProject } from '@/services/projects/portableProject'
 
-export async function exportZip(projectName: string, files: CodeFile[], target?: string): Promise<void> {
+export async function exportZip(projectName: string, files: CodeFile[], target?: string, project?: Project): Promise<void> {
   const zip = new JSZip()
   const folder = zip.folder(projectName)!
   for (const file of files) {
     folder.file(file.path, file.content)
+  }
+  if (project) {
+    folder.file('metacore/project.json', JSON.stringify(createPortableProject(project), null, 2))
+    folder.file('metacore/README.md', `# ${project.name}\n\n目标芯片：${project.target}\n工程格式：${project.format}\n\n${project.scheme?.description ?? '尚未生成硬件方案'}\n`)
   }
   
   // 当目标芯片是STM32F103时，包含模板文件

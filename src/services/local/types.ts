@@ -4,6 +4,7 @@ export interface LocalHealth {
   version: string
   workspaceRoot: string
   port: number
+  agentRuntime?: 'internal' | 'deepseek-harness' | string
 }
 
 export interface WorkspaceInfo {

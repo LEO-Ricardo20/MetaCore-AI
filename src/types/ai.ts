@@ -1,4 +1,4 @@
-export type AIProvider = 'openai' | 'deepseek' | 'qwen' | 'siliconflow' | 'ollama' | 'custom'
+export type AIProvider = 'openai' | 'deepseek' | 'qwen' | 'siliconflow' | 'ollama' | 'custom' | 'mock'
 export type AIAPIMode = 'responses' | 'chat-completions'
 
 export interface AIServiceConfig {
@@ -10,6 +10,12 @@ export interface AIServiceConfig {
   model: string
   apiMode?: AIAPIMode
   enabled: boolean
+  mockDelayMs?: number
+  mockFailOnce?: boolean
+  timeoutMs?: number
+  maxOutputTokens?: number
+  stream?: boolean
+  structuredOutput?: boolean
 }
 
 export function resolveAIAPIMode(service: Pick<AIServiceConfig, 'provider' | 'baseURL' | 'apiMode'>): AIAPIMode {
@@ -29,4 +35,5 @@ export const DEFAULT_SERVICES: Omit<AIServiceConfig, 'id' | 'apiKey'>[] = [
   { name: '通义千问', provider: 'qwen', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', apiMode: 'chat-completions', enabled: false },
   { name: 'OpenAI', provider: 'openai', baseURL: 'https://api.openai.com/v1', model: 'gpt-4o', apiMode: 'responses', enabled: false },
   { name: 'Ollama (本地)', provider: 'ollama', baseURL: 'http://127.0.0.1:11434/v1', model: 'llama3', apiMode: 'chat-completions', enabled: false },
+  { name: 'MetaCore Mock（测试）', provider: 'mock', baseURL: 'http://127.0.0.1:3766/mock', model: 'metacore-deterministic', apiMode: 'chat-completions', enabled: false, mockDelayMs: 250 },
 ]

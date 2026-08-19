@@ -28,9 +28,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['server/**/*.mjs', '*.{js,mjs,cjs,ts}'],
+    files: ['server/**/*.mjs', 'scripts/**/*.mjs', '*.{js,mjs,cjs,ts}'],
     languageOptions: {
-      globals: globals.node,
+      globals: { ...globals.node, WebSocket: 'readonly' },
     },
   },
   {

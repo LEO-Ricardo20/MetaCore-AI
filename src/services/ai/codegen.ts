@@ -2,9 +2,10 @@
 import type { AIServiceConfig } from '@/types/ai'
 import type { ChipSpec } from '@/types/hardware'
 import type { Project, CodeFile } from '@/types/project'
-import { AIRequestCancelledError, callAI, type CallAIOptions } from './client'
+import { AIRequestCancelledError, type CallAIOptions } from './client'
 import { buildCodegenPrompt, buildVerifyPrompt } from './prompts'
 import { parseCodeFiles, parseVerification } from './validation'
+import { callTaskContract } from './contracts'
 
 export interface CodegenResult {
   files: CodeFile[]
@@ -19,21 +20,21 @@ export async function runCodegen(
 ): Promise<CodegenResult> {
   if (!project.scheme) throw new Error('请先生成硬件方案')
   const prompt = buildCodegenPrompt(project.scheme!, project.target, project.format, chipSpec)
-  const raw = await callAI(svc, [
+  const result = await callTaskContract(svc, 'firmware-generation', [
     { role: 'system', content: prompt.system },
     { role: 'user', content: prompt.user }
-  ], { temperature: 0.15, signal: options.signal })
-  const files = parseCodeFiles(raw)
+  ], parseCodeFiles, { temperature: 0.15, signal: options.signal })
+  const files = result.contract.data
 
   // 后台自检（不抛出，仅返回 warning）
   let warning: string | undefined
   try {
-    const verifyRaw = await callAI(svc, [
+    const verifyResult = await callTaskContract(svc, 'code-consistency', [
       { role: 'user', content: buildVerifyPrompt(project.scheme, files) }
-    ], { temperature: 0.1, signal: options.signal })
-    const v = parseVerification(verifyRaw)
+    ], parseVerification, { temperature: 0.1, signal: options.signal })
+    const v = verifyResult.contract.data
     if (!v.consistent && v.issues.length > 0) {
-      warning = `AI 自检发现 ${v.issues.length} 个潜在问题：\n${v.issues.join('\n')}`
+      warning = `AI 自检发现 ${v.issues.length} 个潜在问题：\n${v.issues.map((issue) => issue.message).join('\n')}`
     }
   } catch (error) {
     if (error instanceof AIRequestCancelledError) throw error

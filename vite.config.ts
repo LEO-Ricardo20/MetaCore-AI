@@ -11,6 +11,30 @@ export default defineConfig({
   },
   base: './',
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          minSize: 20_000,
+          groups: [
+            {
+              name: 'pdf-renderer',
+              test: /node_modules[\\/]@react-pdf[\\/](renderer|reconciler|layout|pdfkit)/,
+              priority: 3,
+            },
+            {
+              name: 'pdf-font-engine',
+              test: /node_modules[\\/](fontkit|unicode-properties|unicode-trie|linebreak|brotli|dfa|hyphenation|yoga-layout)/,
+              priority: 2,
+            },
+            {
+              name: 'pdf-support',
+              test: /node_modules[\\/]@react-pdf/,
+              priority: 1,
+            },
+          ],
+        },
+      },
+    },
   }
 })

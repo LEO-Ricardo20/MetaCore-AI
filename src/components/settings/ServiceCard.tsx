@@ -19,7 +19,7 @@ export default function ServiceCard({ service, onEdit }: Props) {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<AIConnectionResult | null>(null)
   const isActive = activeServiceId === service.id
-  const needsKey = service.provider !== 'ollama'
+  const needsKey = service.provider !== 'ollama' && service.provider !== 'mock'
   const hasCredential = !needsKey || Boolean(service.apiKey.trim())
 
   async function handleTest() {
@@ -83,7 +83,7 @@ export default function ServiceCard({ service, onEdit }: Props) {
           </div>
           <div className={cn('flex items-center gap-1.5 text-[11px] mt-1.5', hasCredential ? 'text-emerald-500' : isDark ? 'text-slate-600' : 'text-slate-400')}>
             <KeyRound size={11} />
-            {service.provider === 'ollama' ? '本地 Ollama 不要求 API Key' : hasCredential ? '已配置 API Key' : '未配置 API Key'}
+            {service.provider === 'mock' ? '测试 Mock Provider，不需要 API Key' : service.provider === 'ollama' ? '本地 Ollama 不要求 API Key' : hasCredential ? '已配置 API Key' : '未配置 API Key'}
           </div>
         </div>
 

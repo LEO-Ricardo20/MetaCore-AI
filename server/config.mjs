@@ -12,7 +12,10 @@ export const LIMITS = Object.freeze({
   scanFiles: 1800,
   scanDepth: 8,
   buildOutputBytes: 512 * 1024,
-  buildTimeoutMs: 120 * 1000,
+  // First-time PlatformIO/ESP-IDF toolchain installation can take several
+  // minutes on Windows. Keep the limit bounded and configurable instead of
+  // silently waiting forever.
+  buildTimeoutMs: Math.max(30 * 1000, Math.min(10 * 60 * 1000, Number(process.env.METACORE_BUILD_TIMEOUT_MS ?? 5 * 60 * 1000))),
 })
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url))

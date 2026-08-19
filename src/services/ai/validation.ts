@@ -133,6 +133,9 @@ export function parseFlowGraph(text: string): { nodes: FlowNode[]; edges: FlowEd
       id,
       label: requiredString(item.label, `nodes[${index}].label`, 300),
       codeFileRef: optionalString(item.codeFileRef, 500),
+      codeLine: item.codeLine === undefined ? undefined : Math.max(1, Math.round(finiteNumber(item.codeLine, `nodes[${index}].codeLine`))),
+      functionName: optionalString(item.functionName, 300),
+      evidence: optionalString(item.evidence, 2_000),
       codeSnippet: optionalString(item.codeSnippet, 4_000),
       nodeStyle: optionalString(item.nodeStyle, 80),
       type: optionalString(item.type, 80),
@@ -158,14 +161,42 @@ export function parseFlowGraph(text: string): { nodes: FlowNode[]; edges: FlowEd
   return { nodes, edges }
 }
 
-export function parseVerification(text: string): { consistent: boolean; issues: string[] } {
+export interface VerificationIssue {
+  severity: 'info' | 'warning' | 'error'
+  category: string
+  message: string
+  evidence?: string
+  file?: string
+  line?: number
+  expected?: string
+  actual?: string
+  fixSuggestion?: string
+}
+
+export function parseVerification(text: string): { consistent: boolean; score: number; issues: VerificationIssue[] } {
   const data = parseAIJSON(text, '代码自检结果')
   if (typeof data.consistent !== 'boolean') throw new Error('AI 自检结果缺少 consistent 字段')
+  const issues = arrayField(data.issues, 'issues', 100).map((value, index): VerificationIssue | null => {
+    if (typeof value === 'string' && value.trim()) return { severity: 'warning', category: 'consistency', message: value.trim().slice(0, 2_000) }
+    if (!isRecord(value)) return null
+    const severity = ['info', 'warning', 'error'].includes(String(value.severity)) ? value.severity as VerificationIssue['severity'] : 'warning'
+    const message = requiredString(value.message, `issues[${index}].message`, 2_000)
+    return {
+      severity,
+      category: optionalString(value.category, 120) ?? 'consistency',
+      message,
+      evidence: optionalString(value.evidence, 4_000),
+      file: optionalString(value.file, 500),
+      line: value.line === undefined ? undefined : Math.max(1, Math.round(finiteNumber(value.line, `issues[${index}].line`))),
+      expected: optionalString(value.expected, 2_000),
+      actual: optionalString(value.actual, 2_000),
+      fixSuggestion: optionalString(value.fixSuggestion, 4_000),
+    }
+  }).filter((issue): issue is VerificationIssue => Boolean(issue))
   return {
     consistent: data.consistent,
-    issues: arrayField(data.issues, 'issues', 100)
-      .filter((issue): issue is string => typeof issue === 'string' && Boolean(issue.trim()))
-      .map((issue) => issue.trim().slice(0, 2_000)),
+    score: Math.max(0, Math.min(100, data.score === undefined ? (data.consistent ? 100 : Math.max(0, 100 - issues.length * 10)) : finiteNumber(data.score, 'score'))),
+    issues,
   }
 }
 
