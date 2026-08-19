@@ -4,7 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { CONFIG_PATH, HOST, LIMITS, PACKAGE_META, PORT } from './config.mjs'
+import { CONFIG_PATH, FRONTEND_URL, HOST, LIMITS, PACKAGE_META, PORT } from './config.mjs'
 import { corsHeaders, ensureLocalOrigin, json, readBody } from './lib/http.mjs'
 import { normalizeForCompare, resolveExistingInsideWorkspace, toWorkspaceRelative } from './security/workspace-paths.mjs'
 import { createOpenAICompatibleAdapter } from './services/ai-provider.mjs'
@@ -1262,6 +1262,11 @@ async function route(req, res) {
   }
 
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
+  if (req.method === 'GET' && url.pathname === '/') {
+    res.writeHead(302, { Location: FRONTEND_URL })
+    res.end()
+    return
+  }
   if (req.method === 'GET' && url.pathname === '/api/sessions') {
     json(res, 200, { sessions: await sessionStore.list({ projectId: url.searchParams.get('projectId') ?? undefined, status: url.searchParams.get('status') ?? undefined }) }, origin)
     return

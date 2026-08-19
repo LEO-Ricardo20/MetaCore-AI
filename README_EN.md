@@ -195,7 +195,7 @@ The repository includes a small PlatformIO example for local analysis:
 
 It demonstrates ESP32, Wi-Fi, MQTT, DHT22, SSD1306, I2C, GPIO extraction, dependency detection, and PlatformIO build detection. Replace the example network settings before using it with real hardware.
 
-The real-workspace browser smoke opens the verification workspace, clicks Scan, and verifies that PlatformIO, ESP32, Wi-Fi, MQTT, SSD1306, DHT, I2C, UART, and source-backed GPIO evidence are displayed. If the PlatformIO toolchain is unavailable or cannot be downloaded, firmware compilation must remain blocked or failed and must not be reported as successful.
+The real-workspace browser smoke opens the verification workspace, clicks Scan, verifies PlatformIO, ESP32, Wi-Fi, MQTT, SSD1306, DHT, I2C, UART, and source-backed GPIO evidence, then runs the PlatformIO firmware build through the allowlisted build entry and verifies `SUCCESS`.
 
 ## Commands
 
@@ -280,7 +280,7 @@ npm run verify:delivery
 
 Unit tests validate AI result structures, canonical project state, portable project archives, flow references, and generated-file path safety. The local service test creates a temporary PlatformIO-like project and verifies workspace setup, directory listing, linked-path escape protection, ESP32 and IoT protocol detection, dependency extraction, file writing with backup, report generation, build profile detection, AI proxy calls, model discovery, Responses API handling, and upstream error propagation.
 
-`test:e2e` uses an explicitly labeled deterministic mock provider to verify the AI orchestration state machine; it is not a real DeepSeek call. `test:e2e:real` uses the repository ESP32 project to verify the actual local-analysis UI. Real firmware compilation still depends on an available local PlatformIO, ESP-IDF, or CMake toolchain and its dependencies.
+`test:e2e` uses an explicitly labeled deterministic mock provider to verify the AI orchestration state machine; it is not a real DeepSeek call. `test:e2e:real` uses the repository ESP32 project to verify the actual local-analysis UI and PlatformIO build. Other projects still require their matching local PlatformIO, ESP-IDF, or CMake toolchain and dependencies.
 
 Run the production build before submitting changes:
 

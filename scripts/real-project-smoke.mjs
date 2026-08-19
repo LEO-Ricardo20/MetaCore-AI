@@ -94,6 +94,20 @@ async function clickText(cdp, value) {
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 })
 }
 
+async function clickLastExactText(cdp, value) {
+  const target = await cdp.evaluate(`(() => { const buttons = [...document.querySelectorAll('button')].filter((item) => item.innerText.trim() === ${JSON.stringify(value)} && !item.disabled); const button = buttons.at(-1); if (!button) return null; const rect = button.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`)
+  if (!target) throw new Error(`没有找到可点击按钮：${value}`)
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 })
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 })
+}
+
+async function clickTitle(cdp, value) {
+  const target = await cdp.evaluate(`(() => { const button = [...document.querySelectorAll('button')].find((item) => item.title === ${JSON.stringify(value)} && !item.disabled); if (!button) return null; const rect = button.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`)
+  if (!target) throw new Error(`没有找到可点击按钮：${value}`)
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 })
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 })
+}
+
 try {
   await waitFor('http://127.0.0.1:3766/api/health')
   await fetch('http://127.0.0.1:3766/api/workspace/set', {
@@ -141,10 +155,19 @@ try {
   for (const expected of ['SSD1306', 'DHT', 'I2C', 'UART', 'DHT_PIN', 'OLED_SDA', 'OLED_SCL']) {
     if (!body.includes(expected)) throw new Error(`真实工程硬件页缺少识别结果：${expected}\nbody=${body.slice(-9000)}`)
   }
+  await clickLastExactText(cdp, '构建')
+  await cdp.waitText('可用构建', 5_000)
+  await cdp.evaluate('window.confirm = () => true')
+  await clickTitle(cdp, '执行白名单构建命令')
+  await cdp.waitExpression(`document.body?.innerText?.includes('构建成功') && document.body?.innerText?.includes('[SUCCESS]')`, 60_000)
+  const buildRequest = await cdp.evaluate(`(window.__metacoreFetches ?? []).findLast((item) => item.url.includes('/api/build/run'))`)
+  if (buildRequest?.status !== 200 || !buildRequest?.body?.includes('"success":true')) {
+    throw new Error(`浏览器构建请求没有成功：${JSON.stringify(buildRequest)}`)
+  }
   const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   await fs.mkdir(path.dirname(screenshotPath), { recursive: true })
   await fs.writeFile(screenshotPath, Buffer.from(screenshot.data, 'base64'))
-  console.log(JSON.stringify({ ok: true, workspace, screenshot: screenshotPath, checks: ['PlatformIO', 'ESP32', 'Wi-Fi', 'MQTT', 'SSD1306', 'DHT', 'I2C'] }, null, 2))
+  console.log(JSON.stringify({ ok: true, workspace, screenshot: screenshotPath, checks: ['PlatformIO', 'ESP32', 'Wi-Fi', 'MQTT', 'SSD1306', 'DHT', 'I2C', 'PlatformIO build SUCCESS'] }, null, 2))
   cdp.close()
 } catch (error) {
   console.error(error instanceof Error ? error.stack : error)

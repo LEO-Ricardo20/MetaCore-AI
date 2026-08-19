@@ -33,3 +33,4 @@ npm-debug.log*
 server/.metacore-local.json
 .cache/
 artifacts/
+.pio/

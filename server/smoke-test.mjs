@@ -151,6 +151,9 @@ try {
   })
 
   await waitForServer()
+  const rootResponse = await fetch(`http://127.0.0.1:${PORT}/`, { redirect: 'manual' })
+  assert.equal(rootResponse.status, 302)
+  assert.equal(rootResponse.headers.get('location'), 'http://127.0.0.1:5173')
   await request('/workspace/set', { method: 'POST', body: JSON.stringify({ root: tempRoot }) })
 
   const listing = await request('/files/list')

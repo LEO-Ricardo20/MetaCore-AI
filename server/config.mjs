@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 export const HOST = '127.0.0.1'
 export const PORT = Number(process.env.METACORE_LOCAL_PORT ?? 3766)
+export const FRONTEND_URL = process.env.METACORE_FRONTEND_URL ?? 'http://127.0.0.1:5173'
 
 export const LIMITS = Object.freeze({
   readBytes: 2 * 1024 * 1024,

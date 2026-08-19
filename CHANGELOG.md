@@ -19,6 +19,7 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 - Consolidated the browser information architecture into Workspace, Design, Implementation, Verification, and Projects, while keeping legacy routes redirect-compatible.
 - Migrated persisted projects without clearing the existing `metacore-projects` browser storage key.
 - Updated localhost requests and delivery verification so real workspace scanning is exercised through the browser UI.
+- Redirected the localhost service root to the frontend and extended the real ESP32 browser smoke through an actual PlatformIO build.
 
 ## [2.2.0] - 2026-08-17
 

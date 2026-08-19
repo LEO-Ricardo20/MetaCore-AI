@@ -249,7 +249,7 @@ Job 默认最多并发 2 个，Session 和操作日志默认写入操作系统�
 
 示例包含 ESP32、Wi-Fi、MQTT、DHT22、SSD1306、I2C、GPIO、依赖识别和 PlatformIO 构建检测。连接真实硬件前，请替换示例网络配置。
 
-真实工程浏览器 smoke 会打开验证工作区、点击“扫描”，并确认 PlatformIO、ESP32、Wi-Fi、MQTT、SSD1306、DHT、I2C、UART 和真实 GPIO 证据能够显示。PlatformIO 工具链缺失或下载失败时，真实固件构建必须保持 blocked/failed，不能被描述为成功。
+真实工程浏览器 smoke 会打开验证工作区、点击“扫描”，确认 PlatformIO、ESP32、Wi-Fi、MQTT、SSD1306、DHT、I2C、UART 和真实 GPIO 证据能够显示，然后通过白名单构建入口执行 PlatformIO 固件构建并确认 `SUCCESS`。
 
 ## 常用命令
 
@@ -343,7 +343,7 @@ npm run verify:delivery
 
 当前改造新增覆盖项目生命周期迁移、Artifact stale 传播、Pipeline 取消/重试、AI Task Contract repair、上下文选择、Session/Job/SSE 顺序和日志脱敏。
 
-`test:e2e` 使用明确标识的 Deterministic Mock Provider 验证 AI 编排状态机，不代表真实 DeepSeek 调用；`test:e2e:real` 使用仓库内 ESP32 工程验证真实本地分析页面。真实固件编译仍取决于本机 PlatformIO/ESP-IDF/CMake 工具链和依赖是否可用。
+`test:e2e` 使用明确标识的 Deterministic Mock Provider 验证 AI 编排状态机，不代表真实 DeepSeek 调用；`test:e2e:real` 使用仓库内 ESP32 工程验证真实本地分析页面和 PlatformIO 构建。其他工程的真实固件编译仍取决于本机 PlatformIO/ESP-IDF/CMake 工具链和依赖是否可用。
 
 提交改动前运行生产构建：
 
@@ -404,7 +404,7 @@ npm run dev:server
 - 当前没有 capability token、请求速率保护或同一工作区写操作锁；服务只适合单用户本机 loopback 使用。
 - 验证工作区的构建、安全和发布 Tab 当前以统一质量门禁面板呈现，完整的专用操作仍复用原本地工作区能力。
 - PDF renderer 和 PDF worker 仍会生成较大的异步 chunk，构建会提示体积警告；这不影响功能，但后续可继续拆分依赖。
-- `verify:delivery` 验证应用编排和真实工程扫描，但不会下载大型嵌入式工具链；若 PlatformIO 编译器或依赖未安装，构建门禁会明确失败或阻断，不能据此宣称固件已真实编译通过。
+- `verify:delivery` 使用仓库内真实 ESP32 示例验证应用编排、工程扫描和 PlatformIO 固件构建；其他目标工程仍需单独准备对应工具链。
 
 ## 参与贡献
 
