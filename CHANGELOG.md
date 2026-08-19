@@ -6,6 +6,23 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-08-19
+
+### Changed
+
+- Updated primary action buttons to share the Project Manager's blue-cyan to indigo gradient, hover lift, and restrained glow for a consistent visual hierarchy across workspace, design, implementation, verification, local analysis, and chip workflows.
+- Refined the dark theme from near-black surfaces to a blue-gray graphite palette with distinct ambient blue, teal, violet, and workflow-stage accents.
+
+### Fixed
+
+- Fixed the pending-issues menu overflowing or being clipped by the sidebar; it now uses a viewport-aware portal position, flips above the trigger when needed, and remains usable on narrow mobile screens.
+- Fixed cancellation races where a backend Job could continue after the user cancelled before the frontend received its Job ID; newly created Jobs are now cancelled immediately when the signal is already aborted.
+- Kept the GitHub repository entry visible in the fixed sidebar system area instead of allowing navigation scrolling to hide it.
+
+### Verified
+
+- Added browser assertions and screenshots for pending-issues viewport bounds, desktop/mobile layouts, GitHub link behavior, light/dark workspace surfaces, project primary actions, and the standalone changelog section.
+
 ## [2.3.0] - 2026-08-19
 
 ### Added

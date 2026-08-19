@@ -135,7 +135,7 @@ export default function AssistedMode({ onDone }: Props) {
             <button
               onClick={handlePrefill}
               disabled={filling}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+              className="btn-primary flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium text-white transition-all hover:-translate-y-0.5 disabled:opacity-50"
             >
               {filling ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
               {filling ? 'AI 预填中...' : 'AI 预填'}

@@ -20,7 +20,7 @@ export default function DesignArtifactView({ tab }: { tab: DesignArtifactTab }) 
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500"><FileText size={25} /></div>
         <h2 className="text-base font-semibold text-[var(--text-primary)]">还没有硬件方案</h2>
         <p className="max-w-md text-sm text-[var(--text-secondary)]">系统必须先完成需求分析和硬件约束校验，后续的方案、引脚、BOM 和接线视图才会有可靠数据。</p>
-        <button type="button" onClick={() => navigate('/design/requirements')} className="mt-2 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"><ArrowRight size={14} /> 去生成硬件方案</button>
+        <button type="button" onClick={() => navigate('/design/requirements')} className="btn-primary mt-2 inline-flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium text-white"><ArrowRight size={14} /> 去生成硬件方案</button>
       </section>
     )
   }
@@ -39,7 +39,7 @@ export default function DesignArtifactView({ tab }: { tab: DesignArtifactTab }) 
         <InfoList title="待确认项" items={scheme.openQuestions ?? []} empty="暂无待确认项" tone="amber" />
         <InfoList title="风险提示" items={(scheme.risks ?? []).map((risk) => risk.message)} empty="暂无风险提示" tone="red" icon={<ShieldAlert size={15} />} />
       </div>
-      <div className="flex justify-end"><button type="button" onClick={() => navigate('/implementation/code')} className="inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">进入代码生成 <ArrowRight size={14} /></button></div>
+      <div className="flex justify-end"><button type="button" onClick={() => navigate('/implementation/code')} className="btn-primary inline-flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium text-white">进入代码生成 <ArrowRight size={14} /></button></div>
     </div>
   )
 }

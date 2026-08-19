@@ -77,38 +77,37 @@ export default function RequirementPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-6 py-8">
+    <div>
+      <div className="mx-auto max-w-5xl">
         {/* 页头 */}
-        <div className="mb-8 slide-in-left">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-              <Cpu size={13} className="text-indigo-400" />
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 slide-in-left">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--accent-cyan)]">
+              <Cpu size={16} />
             </div>
-            <span className="text-xs text-indigo-400 font-medium tracking-wide uppercase">Hardware Architect</span>
+            <div><h2 className="text-sm font-semibold text-[var(--text-primary)]">描述你的硬件需求</h2><p className="mt-0.5 text-xs text-[var(--text-secondary)]">系统将按依赖顺序编排硬件方案与工程产物</p></div>
           </div>
-          <h1 className="mb-1 text-2xl font-bold text-[var(--text-primary)]">描述你的硬件需求</h1>
-          <p className="text-sm text-[var(--text-secondary)]">AI 自动生成完整的硬件方案、引脚分配和采购清单</p>
+          <span className="status-badge border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--text-secondary)]">Hardware Architect</span>
         </div>
 
         {/* 输入卡片 */}
-        <div className="glass rounded-2xl p-5 mb-4 slide-in-left" style={{ animationDelay: '50ms' }}>
+        <div className="command-composer mb-4 rounded-[var(--radius-panel)] p-5 slide-in-left" style={{ animationDelay: '50ms' }}>
           <textarea
             value={req}
             onChange={e => setReq(e.target.value)}
             placeholder="例如：做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测环境温湿度，通过 WiFi 连接服务器获取天气..."
             rows={5}
-            className="w-full resize-none bg-transparent text-sm leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+            className="min-h-32 w-full resize-none bg-transparent text-sm leading-7 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
           />
 
           {/* 示例 */}
-          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-800/60">
-            <span className="text-xs text-slate-600 self-center">示例：</span>
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <span className="self-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Prompts</span>
             {EXAMPLES.map(ex => (
               <button
                 key={ex}
                 onClick={() => setReq(ex)}
-                className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/60 text-slate-400 hover:text-indigo-300 hover:bg-indigo-950/40 transition-all duration-200 border border-slate-700/40 hover:border-indigo-500/30"
+                className="rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--border-medium)] hover:text-[var(--text-primary)]"
               >
                 {ex.split('：')[0]}
               </button>
@@ -117,18 +116,18 @@ export default function RequirementPage() {
         </div>
 
         {/* 配置行 */}
-        <div className="flex items-center gap-4 mb-4 flex-wrap slide-in-left" style={{ animationDelay: '100ms' }}>
+        <div className="surface-panel mb-4 flex flex-wrap items-center gap-3 p-3 slide-in-left" style={{ animationDelay: '100ms' }}>
           {/* 芯片选择 */}
-          <div className="glass rounded-xl p-1 flex gap-1 flex-wrap">
+          <div className="context-card flex flex-wrap gap-1 rounded-[var(--radius-control)] p-1">
             {allChips.map(c => (
               <button
                 key={c}
                 onClick={() => setTarget(c)}
                 className={cn(
-                  'text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-150',
+                  'rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all duration-150',
                   target === c
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                    ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
                 )}
               >
                 {c}
@@ -138,37 +137,37 @@ export default function RequirementPage() {
               onClick={() => navigate('/design/chips')}
               title="管理芯片"
               aria-label="管理芯片"
-              className="text-xs px-2 py-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+              className="rounded-[6px] px-2 py-1.5 text-xs text-[var(--text-muted)] transition-all hover:bg-[var(--surface-hover)] hover:text-[var(--accent-cyan)]"
             >
               <Settings2 size={13} />
             </button>
           </div>
 
           {/* 工程格式 */}
-          <div className="glass rounded-xl p-1 flex gap-1">
+          <div className="context-card flex gap-1 rounded-[var(--radius-control)] p-1">
             {FORMATS.map(f => (
               <button
                 key={f.value}
                 onClick={() => setFormat(f.value)}
                 className={cn(
-                  'text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-1.5',
+                  'flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all duration-150',
                   format === f.value
-                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                    ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
                 )}
               >
                 {f.label}
-                <span className={cn('text-[10px]', format === f.value ? 'text-violet-300' : 'text-slate-600')}>{f.desc}</span>
+                <span className={cn('text-[10px]', format === f.value ? 'text-[var(--accent-cyan)]' : 'text-[var(--text-muted)]')}>{f.desc}</span>
               </button>
             ))}
           </div>
 
           {/* 驱动预选面板 */}
-          <div className="mt-3">
+          <div>
             <button
               onClick={() => setDriverPanelOpen(v => !v)}
               className={cn(
-                'flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all duration-150',
+                'flex items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs transition-all duration-150',
                 isDark
                   ? 'text-orange-400 hover:bg-orange-500/10'
                   : 'text-orange-600 hover:bg-orange-500/10'
@@ -214,11 +213,11 @@ export default function RequirementPage() {
           </div>
 
           {/* 生成模式：把系统执行顺序明确呈现给用户 */}
-          <div className="flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-hover)] p-1" aria-label="生成模式">
-            <button type="button" disabled={isGenerating} onClick={() => setGenerationMode('scheme-only')} className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-colors', generationMode === 'scheme-only' ? 'bg-indigo-600 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>
+          <div className="context-card flex items-center gap-1 rounded-[var(--radius-control)] p-1" aria-label="生成模式">
+            <button type="button" disabled={isGenerating} onClick={() => setGenerationMode('scheme-only')} className={cn('rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors', generationMode === 'scheme-only' ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>
               仅生成方案
             </button>
-            <button type="button" disabled={isGenerating} onClick={() => setGenerationMode('full-generation')} className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-colors', generationMode === 'full-generation' ? 'bg-violet-600 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>
+            <button type="button" disabled={isGenerating} onClick={() => setGenerationMode('full-generation')} className={cn('rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors', generationMode === 'full-generation' ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>
               完整生成
             </button>
           </div>
@@ -228,10 +227,10 @@ export default function RequirementPage() {
             onClick={() => handleGenerate()}
             disabled={!isGenerating && !req.trim()}
             className={cn(
-              'ml-auto flex items-center gap-2 px-5 py-2 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0',
+              'ml-auto flex items-center gap-2 rounded-[var(--radius-control)] px-5 py-2 text-sm font-medium text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 active:translate-y-0',
               isGenerating
                 ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20'
-                : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-indigo-500/20'
+                : 'btn-primary'
             )}
           >
             {isGenerating
@@ -329,7 +328,7 @@ export default function RequirementPage() {
             <div className="flex justify-end">
               <button
                 onClick={() => navigate('/implementation/code')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-sm font-medium rounded-xl shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                className="btn-primary flex items-center gap-2 rounded-[var(--radius-control)] px-5 py-2.5 text-sm font-medium text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
               >
                 生成工程代码 <ChevronRight size={15} />
               </button>

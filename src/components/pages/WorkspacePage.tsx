@@ -67,14 +67,14 @@ export default function WorkspacePage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1440px] px-5 py-6 lg:px-8 lg:py-8">
-        <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
+      <div className="page-container tone-workspace">
+        <header className="workspace-header flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
-              <Activity size={14} /> 工作台
+            <div className="workspace-eyebrow">
+              <Activity size={13} /> Agent Workspace
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">项目研发状态</h1>
-            <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">从当前项目继续需求、设计、固件实现和发布验证。</p>
+            <h1 className="workspace-title">项目研发状态</h1>
+            <p className="workspace-subtitle">从当前项目继续需求、设计、固件实现和发布验证，所有生成与检查都保留运行轨迹。</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/design/requirements" className="btn-primary inline-flex items-center gap-2 rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-medium text-white" aria-label="从需求开始">
@@ -91,10 +91,10 @@ export default function WorkspacePage() {
         ) : (
           <>
             <section className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.8fr)]">
-              <div className="surface-panel p-5">
+              <div className="surface-panel hero-panel p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="mb-2 flex items-center gap-2 text-xs text-cyan-300"><Cpu size={14} /> 当前项目</div>
+                    <div className="mb-2 flex items-center gap-2 text-xs text-[var(--accent-cyan)]"><Cpu size={14} /> CURRENT PROJECT</div>
                     <h2 className="truncate text-xl font-semibold text-[var(--text-primary)]">{current.name}</h2>
                     <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{current.target} · {current.format} · 更新于 {new Date(current.updatedAt).toLocaleString('zh-CN')}</p>
                   </div>
@@ -109,7 +109,7 @@ export default function WorkspacePage() {
                     })}
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <Link to="/design" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-500"><Wrench size={14} /> 继续设计</Link>
+                  <Link to="/design" className="btn-primary inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold text-white"><Wrench size={14} /> 继续设计</Link>
                   <Link to="/implementation" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-strong)]"><CodeIcon /> 查看实现</Link>
                   <Link to="/verification" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-strong)]"><ShieldAlert size={14} /> 发布前检查</Link>
                 </div>
@@ -162,7 +162,7 @@ function ConnectionRow({ label, value, online, pending, warning }: { label: stri
 }
 
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof Cpu }) {
-  return <div className="surface-panel p-4"><div className="mb-3 flex items-center justify-between"><span className="text-xs text-[var(--text-secondary)]">{label}</span><Icon size={15} className="text-cyan-400" /></div><p className="truncate text-base font-semibold text-[var(--text-primary)]">{value}</p><p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{detail}</p></div>
+  return <div className="surface-panel metric-tile p-4"><div className="mb-3 flex items-center justify-between"><span className="text-xs text-[var(--text-secondary)]">{label}</span><Icon size={15} className="text-[var(--accent-cyan)]" /></div><p className="truncate text-base font-semibold text-[var(--text-primary)]">{value}</p><p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{detail}</p></div>
 }
 
 function nextAction(stage: ProjectStage) {
@@ -175,5 +175,5 @@ function nextAction(stage: ProjectStage) {
 }
 
 function EmptyWorkspace({ onNavigate }: { onNavigate: (path: string) => void }) {
-  return <section className="surface-panel flex min-h-[420px] flex-col items-center justify-center p-8 text-center"><div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300"><FolderOpen size={26} /></div><h2 className="text-lg font-semibold text-[var(--text-primary)]">还没有当前项目</h2><p className="mt-2 max-w-md text-sm text-[var(--text-secondary)]">从需求开始创建硬件项目，或者打开已有的本地工程进行诊断。</p><div className="mt-6 flex flex-wrap justify-center gap-2"><button type="button" className="btn-primary inline-flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-medium text-white" onClick={() => onNavigate('/design/requirements')}><Plus size={15} /> 创建项目</button><button type="button" className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]" onClick={() => onNavigate('/verification/local')}><HardDrive size={15} /> 打开本地工程</button><button type="button" className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]" onClick={() => onNavigate('/projects')}><FolderOpen size={15} /> 导入项目</button></div></section>
+  return <section className="command-composer flex min-h-[420px] flex-col items-center justify-center rounded-[var(--radius-panel)] p-8 text-center"><div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-medium)] bg-[var(--surface-selected)] text-[var(--accent-cyan)]"><FolderOpen size={26} /></div><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Start a new trajectory</p><h2 className="text-lg font-semibold text-[var(--text-primary)]">还没有当前项目</h2><p className="mt-2 max-w-md text-sm text-[var(--text-secondary)]">描述目标硬件，系统将按需求、方案、实现、验证顺序创建一条可追踪的工程运行轨迹。</p><div className="mt-6 flex flex-wrap justify-center gap-2"><button type="button" className="btn-primary inline-flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-medium text-white" onClick={() => onNavigate('/design/requirements')}><Plus size={15} /> 创建项目</button><button type="button" className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]" onClick={() => onNavigate('/verification/local')}><HardDrive size={15} /> 打开本地工程</button><button type="button" className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]" onClick={() => onNavigate('/projects')}><FolderOpen size={15} /> 导入项目</button></div></section>
 }

@@ -131,7 +131,7 @@ export default function CodegenPage() {
             </div>
           )}
           {!project.scheme ? (
-            <button type="button" onClick={() => navigate('/design/requirements')} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500">
+            <button type="button" onClick={() => navigate('/design/requirements')} className="btn-primary flex items-center gap-2 rounded-[var(--radius-control)] px-4 py-1.5 text-sm font-medium text-white">
               <Sparkles size={14} /> 去生成方案
             </button>
           ) : project.codeFiles.length === 0 ? (
@@ -141,7 +141,7 @@ export default function CodegenPage() {
                 'flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-xl transition-all',
                 isGeneratingCode
                   ? 'bg-red-600 hover:bg-red-500 text-white'
-                  : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0'
+                  : 'btn-primary text-white hover:-translate-y-0.5 active:translate-y-0'
               )}
             >
               {isGeneratingCode ? <Square size={13} /> : <Sparkles size={14} />}

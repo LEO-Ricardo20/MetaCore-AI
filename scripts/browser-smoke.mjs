@@ -92,9 +92,27 @@ async function clickText(cdp, text) {
   if (!clicked) throw new Error(`没有找到可点击按钮：${text}`)
 }
 
+async function clickExactText(cdp, text) {
+  const clicked = await cdp.evaluate(`(() => { const element = [...document.querySelectorAll('button')].find((item) => item.innerText.trim() === ${JSON.stringify(text)} && !item.disabled); if (!element) return false; element.click(); return true; })()`)
+  if (!clicked) throw new Error(`没有找到可点击按钮：${text}`)
+}
+
 async function clickTitle(cdp, title) {
   const clicked = await cdp.evaluate(`(() => { const element = [...document.querySelectorAll('button')].find((item) => item.title === ${JSON.stringify(title)} && !item.disabled); if (!element) return false; element.click(); return true; })()`)
   if (!clicked) throw new Error(`没有找到可点击按钮：${title}`)
+}
+
+async function clickVisibleTitle(cdp, title) {
+  const clicked = await cdp.evaluate(`(() => { const element = [...document.querySelectorAll('button')].find((item) => { const rect = item.getBoundingClientRect(); return item.title === ${JSON.stringify(title)} && !item.disabled && rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left < window.innerWidth && rect.bottom > 0 && rect.top < window.innerHeight; }); if (!element) return false; element.click(); return true; })()`)
+  if (!clicked) throw new Error(`没有找到视口内可点击按钮：${title}`)
+}
+
+async function assertMenuInsideViewport(cdp, label) {
+  await cdp.waitForExpression("Boolean(document.querySelector('[role=menu]'))", 5_000)
+  const bounds = await cdp.evaluate(`(() => { const menu = document.querySelector('[role=menu]'); if (!menu) return null; const rect = menu.getBoundingClientRect(); return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }; })()`)
+  if (!bounds || bounds.left < 0 || bounds.top < 0 || bounds.right > bounds.viewportWidth || bounds.bottom > bounds.viewportHeight) {
+    throw new Error(`${label}待处理菜单超出视口：${JSON.stringify(bounds)}`)
+  }
 }
 
 async function setRequirement(cdp, value) {
@@ -161,11 +179,47 @@ try {
   await screenshot(cdp, 'scheme.png')
   await cdp.evaluate("location.hash = '#/design/pins'")
   await cdp.waitForText('引脚分配')
-  await cdp.evaluate("location.hash = '#/verification/consistency'")
+  await cdp.evaluate(`(() => { const stored = JSON.parse(localStorage.getItem('metacore-projects') || '{}'); const active = stored.state?.projects?.find((item) => item.id === stored.state.currentProjectId) ?? stored.state?.projects?.[0]; if (!active?.artifacts?.flow) return false; active.artifacts.flow.status = 'stale'; active.artifacts.flow.staleReason = 'E2E 视口适配检查'; localStorage.setItem('metacore-projects', JSON.stringify(stored)); location.hash = '#/verification/consistency'; return true; })()`)
+  await cdp.send('Page.reload', { ignoreCache: true })
   await cdp.waitForText('代码与硬件方案一致性')
   await clickText(cdp, '运行一致性检查')
   await cdp.waitForText('一致性校验')
   await screenshot(cdp, 'verification.png')
+  await clickVisibleTitle(cdp, '查看待处理事项')
+  await assertMenuInsideViewport(cdp, '桌面端')
+  await screenshot(cdp, 'pending-issues-desktop.png')
+  await cdp.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+  await clickVisibleTitle(cdp, '查看待处理事项')
+  await assertMenuInsideViewport(cdp, '移动端')
+  await screenshot(cdp, 'pending-issues-mobile.png')
+  await cdp.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
+  await cdp.send('Emulation.clearDeviceMetricsOverride')
+  const githubLink = await cdp.evaluate(`(() => { const link = [...document.querySelectorAll('a')].find((item) => item.textContent?.includes('GitHub')); return link ? { href: link.href, target: link.target, visible: link.getBoundingClientRect().height > 0 } : null; })()`)
+  if (!githubLink?.visible || githubLink.href !== 'https://github.com/LEO-Ricardo20/MetaCore-Studio' || githubLink.target !== '_blank') {
+    throw new Error(`GitHub 入口配置不正确：${JSON.stringify(githubLink)}`)
+  }
+  await cdp.evaluate("location.hash = '#/projects'")
+  await cdp.waitForText('项目管理')
+  await screenshot(cdp, 'projects-primary-actions-light.png')
+  await cdp.evaluate(`localStorage.setItem('metacore-theme', JSON.stringify({ state: { theme: 'dark' }, version: 0 })); location.hash = '#/workspace'`)
+  await cdp.send('Page.reload', { ignoreCache: true })
+  await cdp.waitForText('项目研发状态')
+  await screenshot(cdp, 'workspace-dark.png')
+  await cdp.evaluate("location.hash = '#/design/scheme'")
+  await cdp.waitForText('硬件方案')
+  await screenshot(cdp, 'scheme-dark.png')
+  await cdp.evaluate("location.hash = '#/implementation/code'")
+  await cdp.waitForText('固件工程')
+  await screenshot(cdp, 'implementation-dark.png')
+  await cdp.evaluate("location.hash = '#/verification/consistency'")
+  await cdp.waitForText('代码与硬件方案一致性')
+  await screenshot(cdp, 'verification-dark.png')
+  await cdp.evaluate("location.hash = '#/help'")
+  await cdp.waitForText('使用教程 & 更新日志')
+  await clickExactText(cdp, '更新日志')
+  await cdp.waitForText('按版本查看功能')
+  await screenshot(cdp, 'changelog-dark.png')
   const jobs = await cdp.evaluate(`fetch('http://127.0.0.1:3766/api/jobs?projectId=${encodeURIComponent(project.id)}').then((response) => response.json())`)
   if (!jobs.jobs?.some((job) => job.stage === 'scheme-generation' && job.status === 'succeeded')) throw new Error('方案 Job 未成功完成')
   if (!jobs.jobs?.some((job) => job.stage === 'scheme-validation' && job.status === 'succeeded')) throw new Error('引脚校验 Job 未成功完成')

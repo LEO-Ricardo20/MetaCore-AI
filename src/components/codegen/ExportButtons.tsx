@@ -105,7 +105,7 @@ export default function ExportButtons() {
         onClick={handlePDF}
         disabled={pdffing || blocked || !project}
         title={blocked ? blockedReason : '导出 PDF 方案报告'}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-xl transition-all shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0"
+        className="btn-primary flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-sm text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 active:translate-y-0"
       >
         {pdffing ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
         导出 PDF

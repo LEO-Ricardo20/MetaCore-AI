@@ -43,7 +43,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setAdding(true)}
-              className="h-9 flex-shrink-0 inline-flex items-center justify-center gap-2 px-3 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+              className="btn-primary inline-flex h-9 flex-shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium text-white"
             >
               <Plus size={15} /> 添加服务
             </button>

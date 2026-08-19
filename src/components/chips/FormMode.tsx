@@ -260,7 +260,7 @@ export default function FormMode({ onDone, initialData }: Props) {
         {step < 4 ? (
           <button
             onClick={() => setStep(s => Math.min(4, s + 1))}
-            className="flex items-center gap-1 text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium transition-all shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5"
+            className="btn-primary flex items-center gap-1 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium text-white transition-all hover:-translate-y-0.5"
           >
             下一步 <ChevronRight size={15} />
           </button>

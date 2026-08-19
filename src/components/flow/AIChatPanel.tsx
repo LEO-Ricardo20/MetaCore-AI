@@ -191,7 +191,7 @@ export default function AIChatPanel({ onClose }: { onClose: () => void }) {
             className={cn(
               'p-2 rounded-lg transition-all flex-shrink-0',
               input.trim() && !loading
-                ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:scale-105 active:scale-95'
+                ? 'btn-primary text-white hover:scale-105 active:scale-95'
                 : isDark ? 'bg-slate-700 text-slate-500' : 'bg-indigo-100 text-indigo-300'
             )}
           >

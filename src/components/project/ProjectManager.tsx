@@ -68,7 +68,7 @@ export default function ProjectManager() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="tone-workspace mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
         {/* 页头 */}
         <div className="mb-8 flex flex-col gap-4 slide-in-left sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -109,11 +109,7 @@ export default function ProjectManager() {
             </button>
             <button
               onClick={() => setShowNewForm(true)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-all shadow-lg',
-                'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white hover:-translate-y-0.5 active:translate-y-0',
-                'shadow-cyan-500/20'
-              )}
+              className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
             >
               <Plus size={16} />
               新建项目
@@ -216,10 +212,7 @@ export default function ProjectManager() {
               <button
                 onClick={handleCreate}
                 disabled={!newName.trim()}
-                className={cn(
-                  'px-4 py-2 text-sm rounded-xl transition-all flex items-center gap-1.5',
-                  'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 disabled:opacity-40 text-white'
-                )}
+                className="btn-primary flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm text-white disabled:opacity-40"
               >
                 <Sparkles size={14} />
                 创建并跳转

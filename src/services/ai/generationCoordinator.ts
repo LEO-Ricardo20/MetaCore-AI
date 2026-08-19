@@ -188,9 +188,13 @@ async function runAgentStage<T>(stage: string, service: AIServiceConfig, message
     sessionId,
     stage,
     payload: { service, messages: contractMessages, temperature, taskType },
-  }, signal)
+  })
   activeServerJobId = job.id
   useGenerationStore.getState().update({ jobId: job.id })
+  if (signal.aborted) {
+    await fetch(`${LOCAL_AGENT_API}/jobs/${job.id}/cancel`, { method: 'POST' }).catch(() => {})
+    throw new DOMException('任务已取消', 'AbortError')
+  }
   const result = await waitForAgentJob<{ content: string; usage?: unknown }>(job.id, signal, onProgress)
   activeServerJobId = null
   useGenerationStore.getState().update({ jobId: null })
@@ -203,10 +207,14 @@ async function runPinValidationJob(projectId: string, scheme: HardwareScheme, se
     pin: Number(String(pin.pinNumber).match(/\d+/)?.[0] ?? NaN),
     name: pin.pinName || pin.function,
   }))
-  const job = await postJSON<{ id: string }>('/jobs', { projectId, sessionId, stage: 'scheme-validation', payload: { pins } }, signal)
+  const job = await postJSON<{ id: string }>('/jobs', { projectId, sessionId, stage: 'scheme-validation', payload: { pins } })
   activeServerJobId = job.id
   useGenerationStore.getState().update({ jobId: job.id })
   try {
+    if (signal.aborted) {
+      await fetch(`${LOCAL_AGENT_API}/jobs/${job.id}/cancel`, { method: 'POST' }).catch(() => {})
+      throw new DOMException('任务已取消', 'AbortError')
+    }
     return await waitForAgentJob<{ valid: boolean; conflicts?: unknown[] }>(job.id, signal, onProgress)
   } finally {
     activeServerJobId = null

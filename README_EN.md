@@ -84,9 +84,9 @@ The localhost service provides the local AI proxy and the `本地` workspace bou
 
 ## Release Status
 
-Current release: **v2.3.0** (`2026-08-19`)
+Current release: **v2.3.1** (`2026-08-19`)
 
-Version 2.3.0 completes the staged workflow from requirements, hardware scheme, pins, BOM, and wiring through firmware, flow, verification, and delivery export. It unifies Session, Job, SSE, cancellation, retry, and stale-artifact state, and verifies real workspace scanning plus a PlatformIO firmware build against the repository ESP32 example. The deterministic Mock Provider is used only for orchestration E2E and is not presented as a real DeepSeek call; the successful firmware build also does not imply that a physical board was flashed.
+Version 2.3.1 keeps the complete 2.3.0 staged workflow while standardizing primary actions on the Project Manager's blue-cyan to indigo visual system, improving dark-theme depth, fixing pending-issue popover viewport overflow on desktop/mobile, keeping the GitHub entry visible, and closing a cancellation race before backend Job IDs arrive. Version 2.3.0 completes the staged workflow from requirements, hardware scheme, pins, BOM, and wiring through firmware, flow, verification, and delivery export. It unifies Session, Job, SSE, cancellation, retry, and stale-artifact state, and verifies real workspace scanning plus a PlatformIO firmware build against the repository ESP32 example. The deterministic Mock Provider is used only for orchestration E2E and is not presented as a real DeepSeek call; the successful firmware build also does not imply that a physical board was flashed.
 
 > [!IMPORTANT]
 > MetaCore Studio generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.

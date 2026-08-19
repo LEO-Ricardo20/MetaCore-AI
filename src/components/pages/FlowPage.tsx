@@ -106,7 +106,7 @@ export default function FlowPage() {
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-xl transition-all',
               chatOpen
-                ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/20'
+                ? 'btn-primary text-white'
                 : isDark
                   ? 'bg-slate-700/80 text-slate-200 hover:bg-slate-600/80'
                   : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'
@@ -123,7 +123,7 @@ export default function FlowPage() {
                 'flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-xl transition-all',
                 isGeneratingFlow
                   ? 'bg-red-600 hover:bg-red-500 text-white'
-                  : 'bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0'
+                  : 'btn-primary text-white hover:-translate-y-0.5 active:translate-y-0'
               )}
             >
               {isGeneratingFlow ? <Square size={13} /> : <Sparkles size={14} />}

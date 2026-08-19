@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive } from 'lucide-react'
+import { BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
 import { APP_RELEASE_DATE, APP_VERSION_LABEL } from '@/config/app'
@@ -70,6 +70,13 @@ const SECTIONS = [
       { title: 'AI 问答', desc: '在流程图页面打开 AI 问答，可针对当前项目代码进行提问，AI 携带完整上下文提供专业解答。' },
     ],
   },
+  {
+    id: 'changelog',
+    icon: History,
+    color: 'indigo',
+    title: '更新日志',
+    steps: [],
+  },
 ]
 
 const CHANGELOG = [
@@ -77,8 +84,12 @@ const CHANGELOG = [
     version: APP_VERSION_LABEL,
     date: APP_RELEASE_DATE,
     badge: 'emerald',
-    changes: [
-      '工作流：需求、方案、引脚、BOM、接线、固件、流程和验证阶段统一接入 Session、Job 与 SSE',
+      changes: [
+        '视觉：主要操作按钮统一使用项目管理页的蓝青到靛蓝渐变、悬停和阴影规范',
+        '主题：深色模式改为蓝灰石墨底色，并加入工作台、设计、实现、验证和文档的低饱和阶段色调',
+        '修复：待处理事项弹层使用视口自适应定位，桌面和移动端均不会超出屏幕',
+        '修复：生成任务在 Job ID 返回前取消时，后端任务也会立即取消；GitHub 入口固定在侧栏系统区',
+        '工作流：需求、方案、引脚、BOM、接线、固件、流程和验证阶段统一接入 Session、Job 与 SSE',
       '交互：生成任务支持真实进度、耗时、取消、失败重试、刷新恢复和下游产物过期提示',
       '本地工程：真实扫描 ESP32 示例并通过白名单入口完成 PlatformIO 固件构建',
       '交付：统一门禁覆盖 lint、类型检查、单元测试、本地服务、生产构建和浏览器 E2E',
@@ -263,23 +274,18 @@ export default function HelpPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="page-container tone-documentation max-w-6xl">
         {/* 页头 */}
-        <div className="mb-8 slide-in-left">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-              <BookOpen size={13} className="text-cyan-400" />
-            </div>
-            <span className="text-xs text-cyan-400 font-medium tracking-wide uppercase">Documentation</span>
-          </div>
-          <h1 className={cn('text-2xl font-bold mb-1', isDark ? 'text-white' : 'text-slate-800')}>使用教程 & 更新日志</h1>
-          <p className={cn('text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>快速上手 MetaCore Studio，了解所有功能和使用方法</p>
+        <div className="workspace-header slide-in-left">
+          <div className="workspace-eyebrow"><BookOpen size={13} /> Documentation</div>
+          <h1 className="workspace-title">使用教程 & 更新日志</h1>
+          <p className="workspace-subtitle">快速上手 MetaCore Studio，按板块查看工程工作流、使用说明和版本历史。</p>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:gap-6">
           {/* 左侧导航 */}
-          <div className="w-48 flex-shrink-0">
-            <div className="sticky top-0 space-y-1">
+          <div className="w-full flex-shrink-0 lg:w-48">
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:sticky lg:top-0 lg:block lg:space-y-1">
               {SECTIONS.map(s => {
                 const Icon = s.icon
                 const colors = colorMap[s.color]
@@ -288,12 +294,12 @@ export default function HelpPage() {
                     key={s.id}
                     onClick={() => setActiveSection(s.id)}
                     className={cn(
-                      'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all duration-150',
+                      'flex w-full items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm transition-all duration-150',
                       activeSection === s.id
                         ? `${colors.bg} ${colors.text} font-medium`
                         : isDark
-                          ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
-                          : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                          ? 'text-slate-500 hover:bg-[var(--surface-hover)] hover:text-slate-300'
+                          : 'text-slate-500 hover:bg-[var(--surface-hover)] hover:text-slate-700'
                     )}
                   >
                     <Icon size={14} />
@@ -306,81 +312,58 @@ export default function HelpPage() {
 
           {/* 右侧内容 */}
           <div className="flex-1 min-w-0 space-y-6">
-            {/* 教程内容 */}
-            <div className="slide-in-right">
-              <h2 className={cn('text-lg font-bold mb-4 flex items-center gap-2', isDark ? 'text-white' : 'text-slate-800')}>
-                <currentSection.icon size={18} className={colorMap[currentSection.color].text} />
-                {currentSection.title}
-              </h2>
-              <div className="space-y-3">
-                {currentSection.steps.map((step, i) => (
-                  <div key={i} className="glass-card p-4">
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        'w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
-                        colorMap[currentSection.color].bg,
-                        colorMap[currentSection.color].text
-                      )}>
-                        {i + 1}
+            {activeSection === 'changelog' ? (
+              <div className="slide-in-right">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div><div className="flex items-center gap-2"><History size={18} className="text-indigo-400" /><h2 className={cn('text-lg font-bold', isDark ? 'text-white' : 'text-slate-800')}>更新日志</h2></div><p className="mt-1 text-xs text-[var(--text-secondary)]">按版本查看功能、修复、兼容性和交付验证记录。</p></div>
+                  <span className="status-badge border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">当前 {APP_VERSION_LABEL}</span>
+                </div>
+                <div className="space-y-3">
+                  {CHANGELOG.map((release, releaseIndex) => (
+                    <article key={release.version} className={cn('glass-card p-5', releaseIndex === 0 && 'hero-panel')}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2"><span className={cn('rounded-md px-2 py-0.5 font-mono text-xs font-bold', colorMap[release.badge]?.bg ?? 'bg-slate-500/10', colorMap[release.badge]?.text ?? 'text-slate-400')}>{release.version}</span><span className="text-xs text-[var(--text-muted)]">{release.date}</span></div>
+                        {releaseIndex === 0 && <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-cyan)]">Latest Release</span>}
                       </div>
-                      <div>
-                        <h3 className={cn('text-sm font-semibold mb-1', isDark ? 'text-white' : 'text-slate-800')}>{step.title}</h3>
-                        <p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>{step.desc}</p>
+                      <ul className="mt-3 space-y-2">
+                        {release.changes.map((change, i) => <li key={i} className="flex items-start gap-2 text-xs leading-5 text-[var(--text-secondary)]"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[var(--accent-cyan)]" />{change}</li>)}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="slide-in-right">
+                  <h2 className={cn('text-lg font-bold mb-4 flex items-center gap-2', isDark ? 'text-white' : 'text-slate-800')}>
+                    <currentSection.icon size={18} className={colorMap[currentSection.color].text} />
+                    {currentSection.title}
+                  </h2>
+                  <div className="space-y-3">
+                    {currentSection.steps.map((step, i) => (
+                      <div key={i} className="glass-card p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5', colorMap[currentSection.color].bg, colorMap[currentSection.color].text)}>{i + 1}</div>
+                          <div><h3 className={cn('text-sm font-semibold mb-1', isDark ? 'text-white' : 'text-slate-800')}>{step.title}</h3><p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>{step.desc}</p></div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 更新日志 */}
-            <div className="glass-card p-5 slide-in-right" style={{ animationDelay: '100ms' }}>
-              <h3 className={cn('text-sm font-semibold mb-4 flex items-center gap-2', isDark ? 'text-white' : 'text-slate-800')}>
-                <span className="w-2 h-2 rounded-full bg-indigo-400" />
-                更新日志
-              </h3>
-              <div className="space-y-4">
-                {CHANGELOG.map((release) => (
-                  <div key={release.version} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        'text-xs font-mono font-bold px-2 py-0.5 rounded-md',
-                        colorMap[release.badge]?.bg ?? 'bg-slate-500/10',
-                        colorMap[release.badge]?.text ?? 'text-slate-400'
-                      )}>
-                        {release.version}
-                      </span>
-                      <span className={cn('text-xs', isDark ? 'text-slate-500' : 'text-slate-400')}>{release.date}</span>
-                    </div>
-                    <ul className="space-y-1.5">
-                      {release.changes.map((change, i) => (
-                        <li key={i} className={cn('flex items-start gap-2 text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                          <span className={cn('w-1 h-1 rounded-full mt-1.5 flex-shrink-0', isDark ? 'bg-slate-500' : 'bg-slate-400')} />
-                          {change}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 技巧提示 */}
-            <div className="glass-card p-5 border-cyan-500/10 slide-in-right" style={{ animationDelay: '150ms' }}>
-              <h3 className={cn('text-sm font-semibold mb-2 flex items-center gap-2', isDark ? 'text-white' : 'text-slate-800')}>
-                <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                使用技巧
-              </h3>
-              <ul className={cn('space-y-1.5 text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 需求描述越详细，AI 生成的方案越精准</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 硅基流动提供免费额度，适合日常测试使用</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> ESP-IDF 格式生成的代码最完整，包含 CMakeLists</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 引脚图悬停可查看详细连接信息</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 浏览器项目数据保存在 localStorage，换设备前应及时导出</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 本地工程保存前自动备份，可在「质量」页签恢复历史版本</li>
-                <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 包含 SSD1306 OLED 或 DHT 温湿度的方案会自动注入驱动模板，生成代码可直接上板编译</li>
-              </ul>
-            </div>
+                </div>
+                <div className="glass-card p-5 border-cyan-500/10 slide-in-right" style={{ animationDelay: '100ms' }}>
+                  <h3 className={cn('text-sm font-semibold mb-2 flex items-center gap-2', isDark ? 'text-white' : 'text-slate-800')}><span className="w-2 h-2 rounded-full bg-cyan-400" />使用技巧</h3>
+                  <ul className={cn('space-y-1.5 text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 需求描述越详细，AI 生成的方案越精准</li>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 硅基流动提供免费额度，适合日常测试使用</li>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> ESP-IDF 格式生成的代码最完整，包含 CMakeLists</li>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 引脚图悬停可查看详细连接信息</li>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 浏览器项目数据保存在 localStorage，换设备前应及时导出</li>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 本地工程保存前自动备份，可在「质量」页签恢复历史版本</li>
+                    <li className="flex items-start gap-2"><span className="text-cyan-400 mt-0.5">→</span> 包含 SSD1306 OLED 或 DHT 温湿度的方案会自动注入驱动模板，生成代码可直接上板编译</li>
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

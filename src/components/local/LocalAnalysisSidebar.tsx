@@ -208,7 +208,7 @@ function OverviewTab({ analysis, aiReport, loading, isDark, onAiJudge }: {
       <button
         onClick={onAiJudge}
         disabled={loading === 'ai'}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white transition-colors disabled:opacity-50"
+        className="btn-primary flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {loading === 'ai' ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
         AI 深度判断

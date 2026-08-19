@@ -281,7 +281,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
 
         <div className="flex justify-end gap-2 mt-5">
           <button onClick={onClose} className={cn('h-9 px-4 text-sm rounded-lg transition-colors', isDark ? 'text-slate-300 bg-slate-800 hover:bg-slate-700' : 'text-slate-600 bg-slate-100 hover:bg-slate-200')}>取消</button>
-          <button onClick={handleSave} className="h-9 px-5 text-sm text-white rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors">保存配置</button>
+          <button onClick={handleSave} className="btn-primary h-9 rounded-[var(--radius-control)] px-5 text-sm text-white">保存配置</button>
         </div>
       </div>
     </div>
