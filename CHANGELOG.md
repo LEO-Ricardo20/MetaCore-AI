@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-19
+
 ### Added
 
 - Added the Project Schema v2 lifecycle model, artifact freshness propagation, pipeline run metadata, and explicit project version support.
@@ -13,6 +15,7 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 - Added versioned AI Task Contracts and budgeted, relevance-scored code context selection for flow and consistency tasks.
 - Added product workflow, Agent architecture, security model, local API, and portable project format documentation.
 - Added deterministic browser workflow coverage plus a real ESP32 PlatformIO workspace smoke test.
+- Added real generation progress, cancellation, retry, stale-artifact propagation, and refresh recovery across the staged project workflow.
 
 ### Changed
 
@@ -20,6 +23,19 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 - Migrated persisted projects without clearing the existing `metacore-projects` browser storage key.
 - Updated localhost requests and delivery verification so real workspace scanning is exercised through the browser UI.
 - Redirected the localhost service root to the frontend and extended the real ESP32 browser smoke through an actual PlatformIO build.
+
+### Fixed
+
+- Fixed generation progress timing so React render purity checks pass while elapsed time continues updating correctly.
+- Fixed workflow actions that previously depended on synchronous generation paths by connecting the primary staged workflow to Session, Job, and SSE state.
+- Fixed light-theme text and status contrast across workflow and verification surfaces.
+- Fixed the backend root URL returning `ROUTE_NOT_FOUND`; it now redirects to the configured frontend URL.
+
+### Verified
+
+- Passed lint, TypeScript checking, 26 unit tests, localhost smoke tests, production build, deterministic browser E2E, and real-project browser E2E through `npm run verify:delivery`.
+- Scanned and built `examples/esp32-smart-environment` through the allowlisted backend PlatformIO build entry, producing a non-empty ESP32 firmware binary with a real `SUCCESS` result.
+- Kept deterministic Mock Provider verification explicitly separate from real DeepSeek provider verification and from physical-device flashing.
 
 ## [2.2.0] - 2026-08-17
 

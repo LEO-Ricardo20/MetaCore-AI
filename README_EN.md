@@ -84,9 +84,9 @@ The localhost service provides the local AI proxy and the `本地` workspace bou
 
 ## Release Status
 
-Current release: **v2.2.0** (`2026-08-17`)
+Current release: **v2.3.0** (`2026-08-19`)
 
-Version 2.2.0 renames the product from **MetaCore AI** to **MetaCore Studio** and updates the application UI, npm package, GitHub repository links, documentation, startup scripts, exported reports, and examples. Existing browser storage keys, `.metacore.json` project archives, `.metacore-backups`, and localhost API paths remain compatible so current users can upgrade without losing local data.
+Version 2.3.0 completes the staged workflow from requirements, hardware scheme, pins, BOM, and wiring through firmware, flow, verification, and delivery export. It unifies Session, Job, SSE, cancellation, retry, and stale-artifact state, and verifies real workspace scanning plus a PlatformIO firmware build against the repository ESP32 example. The deterministic Mock Provider is used only for orchestration E2E and is not presented as a real DeepSeek call; the successful firmware build also does not imply that a physical board was flashed.
 
 > [!IMPORTANT]
 > MetaCore Studio generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
@@ -293,7 +293,7 @@ npm run build
 MetaCore Studio follows [Semantic Versioning](https://semver.org/):
 
 - **Major** (`2.0.0`): incompatible architecture or workflow changes
-- **Minor** (`2.2.0`): backward-compatible features or branding updates
+- **Minor** (`2.3.0`): backward-compatible features or workflow updates
 - **Patch** (`2.0.1`): backward-compatible fixes and documentation corrections
 
 The canonical application version is stored in `package.json`. The frontend and localhost service read this value at runtime. Release-facing scripts and the changelog should be updated in the same release commit.

@@ -12,8 +12,8 @@ MetaCore Studio exports one project as a `.metacore.json` archive. The portable 
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.2.0",
-  "exportedAt": "2026-08-18T00:00:00.000Z",
+  "appVersion": "2.3.0",
+  "exportedAt": "2026-08-19T00:00:00.000Z",
   "project": {}
 }
 ```
@@ -82,8 +82,8 @@ MetaCore Studio 可以把单个项目导出为 `.metacore.json` 归档。为了�
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.2.0",
-  "exportedAt": "2026-08-18T00:00:00.000Z",
+  "appVersion": "2.3.0",
+  "exportedAt": "2026-08-19T00:00:00.000Z",
   "project": {}
 }
 ```

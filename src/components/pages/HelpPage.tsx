@@ -78,6 +78,17 @@ const CHANGELOG = [
     date: APP_RELEASE_DATE,
     badge: 'emerald',
     changes: [
+      '工作流：需求、方案、引脚、BOM、接线、固件、流程和验证阶段统一接入 Session、Job 与 SSE',
+      '交互：生成任务支持真实进度、耗时、取消、失败重试、刷新恢复和下游产物过期提示',
+      '本地工程：真实扫描 ESP32 示例并通过白名单入口完成 PlatformIO 固件构建',
+      '交付：统一门禁覆盖 lint、类型检查、单元测试、本地服务、生产构建和浏览器 E2E',
+    ],
+  },
+  {
+    version: 'v2.2.0',
+    date: '2026-08-17',
+    badge: 'cyan',
+    changes: [
       '品牌：产品由 MetaCore AI 正式更名为 MetaCore Studio',
       '同步：更新应用界面、npm 包名、GitHub 仓库链接、文档、报告、提示词和启动脚本',
       '兼容：保留原有浏览器存储键、.metacore.json 项目归档、本地备份目录和 API 路径',
@@ -86,7 +97,7 @@ const CHANGELOG = [
   {
     version: 'v2.1.0',
     date: '2026-08-04',
-    badge: 'cyan',
+    badge: 'indigo',
     changes: [
       '新增：项目可导出和导入带版本的 .metacore.json 归档，便于跨浏览器和电脑迁移',
       '安全：导入前校验工程格式、代码路径、文件体积和流程图引用，项目归档不包含 API Key',

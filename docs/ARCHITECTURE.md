@@ -178,7 +178,7 @@ Session Root 默认位于操作系统用户数据目录，而不是用户工程�
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.2.0",
+  "appVersion": "2.3.0",
   "exportedAt": "ISO-8601",
   "project": {}
 }

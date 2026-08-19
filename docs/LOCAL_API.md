@@ -46,7 +46,7 @@ Agent 和新增 API 使用稳定错误格式：
 {
   "ok": true,
   "service": "metacore-studio-local",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "workspaceRoot": "D:\\Projects\\Demo",
   "port": 3766,
   "agentRuntime": "internal"
