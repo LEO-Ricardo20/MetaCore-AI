@@ -119,6 +119,11 @@ async function setRequirement(cdp, value) {
   return cdp.evaluate(`(() => { const element = document.querySelector('textarea'); if (!element) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(element, ${JSON.stringify(value)}); element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`)
 }
 
+async function selectValue(cdp, selector, value) {
+  const changed = await cdp.evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!(element instanceof HTMLSelectElement)) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(element, ${JSON.stringify(value)}); element.dispatchEvent(new Event('change', { bubbles: true })); return element.value === ${JSON.stringify(value)}; })()`)
+  if (!changed) throw new Error(`无法设置选择项：${selector} = ${value}`)
+}
+
 async function screenshot(cdp, name) {
   const result = await cdp.send('Page.captureScreenshot', { format: 'png' })
   await fs.mkdir(artifacts, { recursive: true })
@@ -133,6 +138,18 @@ try {
   await cdp.evaluate(`localStorage.removeItem('metacore-projects'); localStorage.setItem('metacore-theme', JSON.stringify({ state: { theme: 'light' }, version: 0 })); localStorage.setItem('metacore-ai-config', JSON.stringify({ state: { services: [{ id: 'e2e-mock', name: 'MetaCore Mock（测试）', provider: 'mock', apiKey: '', baseURL: 'http://127.0.0.1:3766/mock', model: 'metacore-deterministic', apiMode: 'chat-completions', enabled: true, mockDelayMs: 2500 }], activeServiceId: 'e2e-mock' }, version: 0 })); 'storage-ready'`)
   await cdp.send('Page.reload', { ignoreCache: true })
   await cdp.waitForText('描述你的硬件需求')
+  await cdp.waitForText('ESP32 开发板配置')
+  await screenshot(cdp, 'esp32-config-light.png')
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+  await new Promise((resolve) => setTimeout(resolve, 350))
+  await cdp.waitForExpression(`(() => { const sidebar = document.querySelector('aside'); return !sidebar || sidebar.getBoundingClientRect().right <= 1; })()`, 3_000)
+  await cdp.evaluate(`(() => { const heading = [...document.querySelectorAll('h3')].find((item) => item.textContent?.includes('ESP32 开发板配置')); heading?.closest('section')?.scrollIntoView({ block: 'start' }); })()`)
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  const configOverflow = await cdp.evaluate('document.documentElement.scrollWidth > window.innerWidth')
+  if (configOverflow) throw new Error('ESP32 配置向导在移动端产生横向溢出')
+  await screenshot(cdp, 'esp32-config-mobile.png')
+  await cdp.send('Emulation.clearDeviceMetricsOverride')
+  await cdp.evaluate('window.scrollTo(0, 0)')
   await setRequirement(cdp, 'Wi-Fi MQTT 环境监测，DHT20 温湿度传感器，SSD1306 OLED，I2C，总线和错误重试')
   await clickText(cdp, '生成硬件方案')
   await cdp.waitForText('取消任务', 5_000)
@@ -150,6 +167,10 @@ try {
   await cdp.evaluate(`(() => { const config = JSON.parse(localStorage.getItem('metacore-ai-config') || '{}'); config.state.services[0].mockDelayMs = 450; localStorage.setItem('metacore-ai-config', JSON.stringify(config)); localStorage.removeItem('metacore-projects'); location.hash = '#/design/requirements'; })()`)
   await cdp.send('Page.reload', { ignoreCache: true })
   await cdp.waitForText('描述你的硬件需求')
+  await cdp.waitForExpression(`Boolean(document.querySelector('select[aria-label="ESP32 开发板"] option[value="esp32-c3-devkitm-1"]'))`, 5_000)
+  await selectValue(cdp, 'select[aria-label="ESP32 开发板"]', 'esp32-c3-devkitm-1')
+  await clickText(cdp, 'PlatformIO')
+  await cdp.waitForText('ESP32-C3-MINI-1')
   await setRequirement(cdp, 'Wi-Fi MQTT 环境监测，DHT20 温湿度传感器，SSD1306 OLED，I2C，总线和错误重试')
   await clickText(cdp, '完整生成')
   await clickText(cdp, '开始完整生成')
@@ -173,6 +194,20 @@ try {
       : null
     const bodyText = await cdp.evaluate('document.body?.innerText ?? ""')
     throw new Error(`完整生成未写入方案、代码和流程图产物\nproject=${JSON.stringify({ id: project?.id, hasScheme: Boolean(project?.scheme), codeFiles: project?.codeFiles?.length ?? 0, flowNodes: project?.flowNodes?.length ?? 0 })}\njobs=${JSON.stringify(jobsSnapshot)}\nbody=${bodyText.slice(-3000)}`)
+  }
+  if (project.esp32?.boardId !== 'esp32-c3-devkitm-1' || project.esp32?.platformioBoard !== 'esp32-c3-devkitm-1') {
+    throw new Error(`完整生成没有保留 ESP32-C3 board profile：${JSON.stringify(project.esp32)}`)
+  }
+  const platformioFile = project.codeFiles.find((file) => file.path === 'platformio.ini')
+  if (!platformioFile?.content.includes('board = esp32-c3-devkitm-1') || platformioFile.content.includes('board = esp32dev')) {
+    throw new Error(`PlatformIO board 配置不正确：${platformioFile?.content ?? 'missing'}`)
+  }
+  const mainFile = project.codeFiles.find((file) => file.path === 'src/main.cpp')
+  if (!mainFile?.content.includes('void setup()') || !mainFile.content.includes('void loop()')) {
+    throw new Error(`PlatformIO Arduino 入口文件不正确：${mainFile?.content ?? 'missing src/main.cpp'}`)
+  }
+  if (project.flowNodes.some((node) => node.codeFileRef && node.codeFileRef !== 'src/main.cpp')) {
+    throw new Error(`流程图证据没有指向生成的 Arduino 入口：${JSON.stringify(project.flowNodes)}`)
   }
   await cdp.evaluate("location.hash = '#/design/scheme'")
   await cdp.waitForText('硬件方案')

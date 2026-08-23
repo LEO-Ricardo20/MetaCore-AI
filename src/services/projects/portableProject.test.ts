@@ -29,6 +29,8 @@ describe('portable project files', () => {
     expect(parsed.name).toBe(project.name)
     expect(parsed.codeFiles[0].path).toBe('src/main.cpp')
     expect(parsed.scheme?.pins[0].pinNumber).toBe('GPIO4')
+    expect(parsed.esp32?.boardId).toBe('esp32-dev-module')
+    expect(parsed.esp32?.platformioBoard).toBe('esp32dev')
   })
 
   it('rejects unsafe generated file paths', () => {
@@ -46,6 +48,12 @@ describe('portable project files', () => {
   it('rejects unknown archive schemas', () => {
     const archive = { ...createPortableProject(project), schemaVersion: 99 }
     expect(() => parsePortableProject(JSON.stringify(archive))).toThrow(/不支持的项目文件版本/)
+  })
+
+  it('rejects unknown ESP32 board profiles instead of silently changing the board', () => {
+    const archive = createPortableProject(project)
+    archive.project.esp32 = { ...archive.project.esp32!, boardId: 'unknown-board' }
+    expect(() => parsePortableProject(JSON.stringify(archive))).toThrow(/未知 ESP32 开发板/)
   })
 
   it('preserves lifecycle metadata without exporting session references or raw responses', () => {

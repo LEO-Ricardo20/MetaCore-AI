@@ -4,7 +4,7 @@ export const APP_NAME = 'MetaCore Studio'
 export const APP_DESCRIPTION = 'AI 辅助的嵌入式硬件架构与工程分析平台，从需求、方案、代码和流程图延伸到本地工程诊断与构建验证。'
 export const APP_VERSION = packageMeta.version
 export const APP_VERSION_LABEL = `v${APP_VERSION}`
-export const APP_RELEASE_DATE = '2026-08-19'
+export const APP_RELEASE_DATE = '2026-08-23'
 
 export const APP_SPONSOR = {
   name: 'VPS.Town',

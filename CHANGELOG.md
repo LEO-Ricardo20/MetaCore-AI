@@ -6,6 +6,33 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-23
+
+### Added
+
+- Added an ESP32 specialization layer for ESP32, ESP32-S3, ESP32-C3, ESP32-C6, and ESP32-S2 with separate SoC, module, development-board, PlatformIO board, ESP-IDF target, Flash, PSRAM, USB, wireless, serial, partition, and source metadata.
+- Added the ESP32 board configuration wizard to project creation and requirement generation, including board-aware framework availability and locally verified PlatformIO manifest status.
+- Added board-aware GPIO validation for reserved, unavailable, input-only, strapping, USB-shared, and duplicate pin assignments.
+- Added `docs/ESP32_SPECIALIZATION.md` with a five-family comparison and practical Arduino, PlatformIO, and ESP-IDF setup flows.
+
+### Changed
+
+- PlatformIO prompt skeletons now generate the selected board ID, framework, Flash mode, partition, upload speed, and monitor speed instead of always using `esp32dev`.
+- ESP-IDF prompt skeletons now record the selected `idf.py set-target` and matching Flash configuration.
+- Project Schema 3 stores an optional ESP32 board profile while automatically migrating older ESP32 projects to a compatible default.
+- Deterministic Mock Provider fixtures now honor the board ID and recommended I2C pins injected by the same production prompt path.
+
+### Fixed
+
+- Removed fabricated ESP32-S3 DAC capabilities and stopped treating the N8 board profile as an N16R8 module with 8MB PSRAM.
+- Prevented ESP32-C6 PlatformIO Arduino from appearing as verified when the installed board manifest only declares ESP-IDF.
+
+### Verified
+
+- Verified 33 unit tests, localhost smoke tests, production build, classic ESP32 cancellation/retry, and a complete ESP32-C3 PlatformIO Mock generation workflow.
+- Verified the generated C3 `platformio.ini` contains `board = esp32-c3-devkitm-1` and never falls back to `esp32dev`.
+- Re-scanned and successfully built `examples/esp32-smart-environment` through the allowlisted real PlatformIO build entry. No physical-device flash was claimed.
+
 ## [2.3.1] - 2026-08-19
 
 ### Changed

@@ -68,40 +68,57 @@ function validateService(service) {
 
 const mockFailures = new Set()
 
-function mockContract(taskType) {
+function mockEsp32Context(messages) {
+  const prompt = messages.map((message) => String(message?.content ?? '')).join('\n')
+  const board = prompt.match(/PlatformIO board：([^\n]+)/)?.[1]?.trim() ?? 'esp32dev'
+  const idfTarget = prompt.match(/ESP-IDF target:\s*([a-z0-9]+)/i)?.[1]?.trim() ?? 'esp32'
+  const framework = prompt.match(/工程：platformio\s*\/\s*(arduino|espidf)/i)?.[1]?.toLowerCase() ?? 'espidf'
+  const module = prompt.match(/- 模组：([^\n]+)/)?.[1]?.trim() ?? 'ESP32-WROOM-32'
+  const i2c = idfTarget === 'esp32' ? [21, 22] : idfTarget === 'esp32c6' ? [6, 7] : [8, 9]
+  const arduino = framework === 'arduino' || /void\s+setup\s*\(/.test(prompt) || prompt.includes('src/main.cpp')
+  return { board, idfTarget, framework, module, arduino, sda: i2c[0], scl: i2c[1] }
+}
+
+function mockContract(taskType, messages = []) {
+  const esp32 = mockEsp32Context(messages)
   const base = { schemaVersion: '1.0', taskType, status: 'ok', assumptions: ['使用确定性 Mock Provider，仅用于本地流程验收'], openQuestions: [], risks: [], evidence: [{ source: 'MetaCore deterministic fixture', file: 'mock://fixture', line: 1, excerpt: '本地测试数据，不代表真实硬件测量结果' }], validationHints: [] }
   if (taskType === 'hardware-scheme') return { ...base, data: {
     description: 'ESP32 环境监测节点通过 I2C 连接 DHT20 温湿度传感器和 SSD1306 OLED，使用 Wi-Fi 接入网络并通过 MQTT 上报数据；主循环包含采集、校验、重试和显示步骤。',
     pins: [
-      { pinNumber: 'GPIO21', pinName: 'SDA', function: 'I2C 数据线', connectedTo: 'DHT20 + SSD1306', voltage: '3V3' },
-      { pinNumber: 'GPIO22', pinName: 'SCL', function: 'I2C 时钟线', connectedTo: 'DHT20 + SSD1306', voltage: '3V3' },
-      { pinNumber: 'GPIO2', pinName: 'STATUS_LED', function: '状态指示', connectedTo: '板载 LED', voltage: '3V3' },
+      { pinNumber: `GPIO${esp32.sda}`, pinName: 'SDA', function: 'I2C 数据线', connectedTo: 'DHT20 + SSD1306', voltage: '3V3' },
+      { pinNumber: `GPIO${esp32.scl}`, pinName: 'SCL', function: 'I2C 时钟线', connectedTo: 'DHT20 + SSD1306', voltage: '3V3' },
     ],
     bom: [
-      { name: 'ESP32 DevKit', model: 'ESP32-WROOM-32', quantity: 1, unitPrice: 8.5 },
+      { name: 'ESP32 开发板', model: esp32.module, quantity: 1, unitPrice: 8.5 },
       { name: '温湿度传感器', model: 'DHT20', quantity: 1, unitPrice: 3.2 },
       { name: 'OLED 显示屏', model: 'SSD1306 128x64 I2C', quantity: 1, unitPrice: 4.8 },
     ],
     wiring: [
-      { from: 'ESP32 GPIO21 (SDA)', to: 'DHT20 SDA + SSD1306 SDA', wireColor: '绿', note: 'I2C 数据线' },
-      { from: 'ESP32 GPIO22 (SCL)', to: 'DHT20 SCL + SSD1306 SCL', wireColor: '黄', note: 'I2C 时钟线' },
+      { from: `ESP32 GPIO${esp32.sda} (SDA)`, to: 'DHT20 SDA + SSD1306 SDA', wireColor: '绿', note: 'I2C 数据线' },
+      { from: `ESP32 GPIO${esp32.scl} (SCL)`, to: 'DHT20 SCL + SSD1306 SCL', wireColor: '黄', note: 'I2C 时钟线' },
       { from: '3V3', to: 'DHT20 VCC + SSD1306 VCC', wireColor: '红', note: '3.3V 供电' },
       { from: 'GND', to: 'DHT20 GND + SSD1306 GND', wireColor: '黑', note: '公共地' },
     ],
   } }
-  if (taskType === 'firmware-generation') return { ...base, data: { files: [
-    { path: 'src/main.c', language: 'c', content: '#include "drivers/dht20.h"\n#include "drivers/ssd1306.h"\n#include "mqtt_client.h"\n#define SDA_GPIO 21\n#define SCL_GPIO 22\n#define STATUS_LED_GPIO 2\nvoid app_main(void) { i2c_init(SDA_GPIO, SCL_GPIO); dht20_init(); ssd1306_init(); wifi_connect(); mqtt_connect(); while (1) { if (dht20_read_retry()) { mqtt_publish(); ssd1306_show(); } else { led_set(STATUS_LED_GPIO, 1); } delay_ms(5000); } }\n' },
-    { path: 'src/drivers/dht20.h', language: 'h', content: '#pragma once\nint dht20_init(void);\nint dht20_read_retry(void);\n' },
-    { path: 'src/drivers/ssd1306.h', language: 'h', content: '#pragma once\nint ssd1306_init(void);\nint ssd1306_show(void);\n' },
-    { path: 'platformio.ini', language: 'ini', content: '[env:esp32dev]\nplatform = espressif32\nframework = espidf\nboard = esp32dev\n' },
-  ] } }
+  if (taskType === 'firmware-generation') {
+    const main = esp32.arduino
+      ? { path: 'src/main.cpp', language: 'cpp', content: `#include <Arduino.h>\n#include <Wire.h>\n#include "drivers/dht20.h"\n#include "drivers/ssd1306.h"\n#include "connectivity.h"\n#define SDA_GPIO ${esp32.sda}\n#define SCL_GPIO ${esp32.scl}\nvoid setup() { Serial.begin(115200); Wire.begin(SDA_GPIO, SCL_GPIO); dht20_init(); ssd1306_init(); wifi_connect(); mqtt_connect(); }\nvoid loop() { if (dht20_read_retry()) { mqtt_publish(); ssd1306_show(); } else { Serial.println("sensor error"); } delay(5000); }\n` }
+      : { path: 'src/main.c', language: 'c', content: `#include "freertos/FreeRTOS.h"\n#include "freertos/task.h"\n#include "drivers/dht20.h"\n#include "drivers/ssd1306.h"\n#define SDA_GPIO ${esp32.sda}\n#define SCL_GPIO ${esp32.scl}\nvoid app_main(void) { dht20_init(); ssd1306_init(); while (1) { if (dht20_read_retry()) { ssd1306_show(); } vTaskDelay(pdMS_TO_TICKS(5000)); } }\n` }
+    return { ...base, data: { files: [
+      main,
+      { path: 'src/drivers/dht20.h', language: 'h', content: '#pragma once\nstatic inline int dht20_init(void) { return 0; }\nstatic inline int dht20_read_retry(void) { return 1; }\n' },
+      { path: 'src/drivers/ssd1306.h', language: 'h', content: '#pragma once\nstatic inline int ssd1306_init(void) { return 0; }\nstatic inline int ssd1306_show(void) { return 0; }\n' },
+      ...(esp32.arduino ? [{ path: 'src/connectivity.h', language: 'h', content: '#pragma once\nstatic inline void wifi_connect(void) {}\nstatic inline void mqtt_connect(void) {}\nstatic inline void mqtt_publish(void) {}\n' }] : []),
+      { path: 'platformio.ini', language: 'ini', content: `[env:${esp32.board}]\nplatform = espressif32\nframework = ${esp32.framework}\nboard = ${esp32.board}\nmonitor_speed = 115200\n` },
+    ] } }
+  }
   if (taskType === 'code-consistency') return { ...base, data: { consistent: true, score: 100, issues: [] } }
   if (taskType === 'flow-graph') return { ...base, data: { nodes: [
-    { id: 'init', label: '初始化 I2C / OLED / DHT20', codeFileRef: 'src/main.c', codeLine: 7, functionName: 'app_main', evidence: 'i2c_init + dht20_init + ssd1306_init', codeSnippet: 'i2c_init(SDA_GPIO, SCL_GPIO);', nodeStyle: 'init', position: { x: 120, y: 80 } },
-    { id: 'connect', label: '连接 Wi-Fi 与 MQTT', codeFileRef: 'src/main.c', codeLine: 7, functionName: 'app_main', evidence: 'wifi_connect + mqtt_connect', nodeStyle: 'comm', position: { x: 420, y: 80 } },
-    { id: 'read', label: '读取温湿度并重试', codeFileRef: 'src/main.c', codeLine: 7, functionName: 'app_main', evidence: 'dht20_read_retry', nodeStyle: 'sensor', position: { x: 120, y: 260 } },
-    { id: 'publish', label: 'MQTT 上报并更新 OLED', codeFileRef: 'src/main.c', codeLine: 7, functionName: 'app_main', evidence: 'mqtt_publish + ssd1306_show', nodeStyle: 'display', position: { x: 420, y: 260 } },
-    { id: 'error', label: '读取失败，点亮状态灯', codeFileRef: 'src/main.c', codeLine: 7, functionName: 'app_main', evidence: 'led_set', nodeStyle: 'error', position: { x: 700, y: 260 } },
+    { id: 'init', label: '初始化 I2C / OLED / DHT20', codeFileRef: esp32.arduino ? 'src/main.cpp' : 'src/main.c', codeLine: 8, functionName: esp32.arduino ? 'setup' : 'app_main', evidence: 'dht20_init + ssd1306_init', codeSnippet: 'dht20_init(); ssd1306_init();', nodeStyle: 'init', position: { x: 120, y: 80 } },
+    { id: 'connect', label: '连接 Wi-Fi 与 MQTT', codeFileRef: esp32.arduino ? 'src/main.cpp' : 'src/main.c', codeLine: 8, functionName: esp32.arduino ? 'setup' : 'app_main', evidence: 'wifi_connect + mqtt_connect', nodeStyle: 'comm', position: { x: 420, y: 80 } },
+    { id: 'read', label: '读取温湿度并重试', codeFileRef: esp32.arduino ? 'src/main.cpp' : 'src/main.c', codeLine: 9, functionName: esp32.arduino ? 'loop' : 'app_main', evidence: 'dht20_read_retry', nodeStyle: 'sensor', position: { x: 120, y: 260 } },
+    { id: 'publish', label: 'MQTT 上报并更新 OLED', codeFileRef: esp32.arduino ? 'src/main.cpp' : 'src/main.c', codeLine: 9, functionName: esp32.arduino ? 'loop' : 'app_main', evidence: 'mqtt_publish + ssd1306_show', nodeStyle: 'display', position: { x: 420, y: 260 } },
+    { id: 'error', label: '读取失败并记录错误', codeFileRef: esp32.arduino ? 'src/main.cpp' : 'src/main.c', codeLine: 9, functionName: esp32.arduino ? 'loop' : 'app_main', evidence: 'sensor error branch', nodeStyle: 'error', position: { x: 700, y: 260 } },
   ], edges: [
     { id: 'e1', source: 'init', target: 'connect' }, { id: 'e2', source: 'connect', target: 'read' }, { id: 'e3', source: 'read', target: 'publish', label: '成功' }, { id: 'e4', source: 'read', target: 'error', label: '失败' }, { id: 'e5', source: 'publish', target: 'read', label: '下一周期' },
   ] } }
@@ -126,7 +143,7 @@ async function callMock(service, messages, options = {}) {
     error.status = 503; error.code = 'MOCK_FAIL_ONCE'; error.retryable = true
     throw error
   }
-  const content = JSON.stringify(mockContract(taskType))
+  const content = JSON.stringify(mockContract(taskType, messages))
   return { content, model: service.model, provider: 'mock', apiMode: 'chat-completions', durationMs: Date.now() - startedAt, usage: { input: 0, output: content.length, total: content.length }, contextLength: messages.reduce((sum, message) => sum + String(message.content ?? '').length, 0), mock: true }
 }
 

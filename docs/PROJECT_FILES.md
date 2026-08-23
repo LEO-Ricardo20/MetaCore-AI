@@ -4,7 +4,7 @@
 
 ## English
 
-MetaCore Studio exports one project as a `.metacore.json` archive. The portable envelope remains at schema version 1 for compatibility, while the embedded project is normalized to Project Schema v2.
+MetaCore Studio exports one project as a `.metacore.json` archive. The portable envelope remains at schema version 1 for compatibility, while the embedded project is normalized to Project Schema v3.
 
 ### Envelope
 
@@ -12,15 +12,15 @@ MetaCore Studio exports one project as a `.metacore.json` archive. The portable 
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.3.0",
-  "exportedAt": "2026-08-19T00:00:00.000Z",
+  "appVersion": "2.4.0",
+  "exportedAt": "2026-08-23T00:00:00.000Z",
   "project": {}
 }
 ```
 
 `kind` and the envelope `schemaVersion` are stable compatibility identifiers. They are independent from `project.schemaVersion`.
 
-### Project Schema v2
+### Project Schema v3
 
 The embedded project can contain:
 
@@ -32,6 +32,7 @@ The embedded project can contain:
 - Pipeline run summaries and per-stage status, progress, timing, model, provider, prompt version, token usage, retries, and errors.
 - Explicit project version history.
 - Project validation summary.
+- Optional ESP32 board profile with module, PlatformIO board, ESP-IDF target, storage, USB, partition, upload, and monitor settings.
 
 Legacy projects without lifecycle fields are normalized during import and browser-store migration. Missing arrays and status fields are initialized without deleting the original design data.
 
@@ -74,7 +75,7 @@ Importing an archive whose project ID already exists creates a new project ID ra
 
 ## 简体中文
 
-MetaCore Studio 可以把单个项目导出为 `.metacore.json` 归档。为了兼容已有文件，外层归档 Schema 继续保持 1；归档内部项目会规范化为 Project Schema v2。
+MetaCore Studio 可以把单个项目导出为 `.metacore.json` 归档。为了兼容已有文件，外层归档 Schema 继续保持 1；归档内部项目会规范化为 Project Schema v3。
 
 ### 外层 Envelope
 
@@ -82,15 +83,15 @@ MetaCore Studio 可以把单个项目导出为 `.metacore.json` 归档。为了�
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.3.0",
-  "exportedAt": "2026-08-19T00:00:00.000Z",
+  "appVersion": "2.4.0",
+  "exportedAt": "2026-08-23T00:00:00.000Z",
   "project": {}
 }
 ```
 
 外层 `schemaVersion` 与内部 `project.schemaVersion` 是两个独立版本。外层版本表示可移植文件协议，内部版本表示浏览器领域模型。
 
-### Project Schema v2 内容
+### Project Schema v3 内容
 
 内部项目可以包含：
 
@@ -102,6 +103,7 @@ MetaCore Studio 可以把单个项目导出为 `.metacore.json` 归档。为了�
 - 流水线运行摘要，以及各阶段状态、进度、时间、模型、服务商、Prompt 版本、Token、重试和错误。
 - 显式创建的项目版本历史。
 - 项目级质量门禁摘要。
+- 可选 ESP32 开发板 profile，包含模组、PlatformIO board、ESP-IDF target、存储、USB、分区、上传和串口设置。
 
 旧项目缺少生命周期字段时，导入和 Zustand Store 迁移会调用规范化逻辑补齐默认值，不删除原有需求、方案、代码或流程图。
 

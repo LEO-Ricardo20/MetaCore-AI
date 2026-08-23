@@ -19,7 +19,7 @@ export async function runCodegen(
   options: Pick<CallAIOptions, 'signal'> = {},
 ): Promise<CodegenResult> {
   if (!project.scheme) throw new Error('请先生成硬件方案')
-  const prompt = buildCodegenPrompt(project.scheme!, project.target, project.format, chipSpec)
+  const prompt = buildCodegenPrompt(project.scheme!, project.target, project.format, chipSpec, project.esp32)
   const result = await callTaskContract(svc, 'firmware-generation', [
     { role: 'system', content: prompt.system },
     { role: 'user', content: prompt.user }

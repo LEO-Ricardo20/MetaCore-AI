@@ -3,11 +3,14 @@ import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useThemeStore } from '@/store/themeStore'
 import type { Project } from '@/types/project'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
 import { Clock, Cpu, Download, FileUp, FolderOpen, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parsePortableProject, portableProjectFilename, serializePortableProject } from '@/services/projects/portableProject'
+import Esp32BoardWizard from '@/components/esp32/Esp32BoardWizard'
+import { createEsp32ProjectConfig, getDefaultEsp32Profile, getEsp32Profile, isEsp32Target } from '@/services/esp32/esp32Config'
 
-const CHIPS: ChipTarget[] = ['ESP32', 'ESP32-S3', 'STM32F103', 'STM32F4']
+const CHIPS: ChipTarget[] = ['ESP32', 'ESP32-S3', 'ESP32-C3', 'ESP32-C6', 'ESP32-S2', 'STM32F103', 'STM32F4']
 const FORMATS: { value: ProjectFormat; label: string }[] = [
   { value: 'espidf', label: 'ESP-IDF' },
   { value: 'arduino', label: 'Arduino' },
@@ -25,14 +28,30 @@ export default function ProjectManager() {
   const [newName, setNewName] = useState('')
   const [newChip, setNewChip] = useState<ChipTarget>('ESP32')
   const [newFormat, setNewFormat] = useState<ProjectFormat>('espidf')
+  const [newEsp32, setNewEsp32] = useState<Esp32ProjectConfig>(() => createEsp32ProjectConfig())
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   function handleCreate() {
     if (!newName.trim()) return
-    createProject(newName, newChip, newFormat)
+    createProject(newName, newChip, newFormat, undefined, isEsp32Target(newChip) ? newEsp32 : undefined)
     setShowNewForm(false)
     setNewName('')
+  }
+
+  function handleChipChange(chip: ChipTarget) {
+    setNewChip(chip)
+    if (!isEsp32Target(chip)) return
+    const config = createEsp32ProjectConfig(getDefaultEsp32Profile(chip))
+    setNewEsp32(config)
+    const profile = getEsp32Profile(config.boardId)
+    if (profile && !profile.supportedFormats.includes(newFormat)) setNewFormat(profile.supportedFormats[0])
+  }
+
+  function handleFormatChange(format: ProjectFormat) {
+    const profile = getEsp32Profile(newEsp32.boardId)
+    if (isEsp32Target(newChip) && profile && !profile.supportedFormats.includes(format)) return
+    setNewFormat(format)
   }
 
   function handleDelete(id: string) {
@@ -154,13 +173,13 @@ export default function ProjectManager() {
               />
               <div className="flex gap-3 flex-wrap">
                 <div className={cn(
-                  'flex gap-1 rounded-xl p-1',
+                  'flex flex-wrap gap-1 rounded-xl p-1',
                   isDark ? 'bg-slate-700/50' : 'bg-slate-100'
                 )}>
                   {CHIPS.map(c => (
                     <button
                       key={c}
-                      onClick={() => setNewChip(c)}
+                      onClick={() => handleChipChange(c)}
                       className={cn(
                         'text-xs px-3 py-1.5 rounded-lg font-medium transition-all',
                         newChip === c
@@ -175,15 +194,16 @@ export default function ProjectManager() {
                   ))}
                 </div>
                 <div className={cn(
-                  'flex gap-1 rounded-xl p-1',
+                  'flex flex-wrap gap-1 rounded-xl p-1',
                   isDark ? 'bg-slate-700/50' : 'bg-slate-100'
                 )}>
                   {FORMATS.map(f => (
                     <button
                       key={f.value}
-                      onClick={() => setNewFormat(f.value)}
+                      onClick={() => handleFormatChange(f.value)}
+                      disabled={Boolean(isEsp32Target(newChip) && !getEsp32Profile(newEsp32.boardId)?.supportedFormats.includes(f.value))}
                       className={cn(
-                        'text-xs px-3 py-1.5 rounded-lg font-medium transition-all',
+                        'text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:cursor-not-allowed disabled:opacity-35',
                         newFormat === f.value
                           ? 'bg-indigo-600 text-white shadow'
                           : isDark
@@ -196,6 +216,16 @@ export default function ProjectManager() {
                   ))}
                 </div>
               </div>
+              {isEsp32Target(newChip) && (
+                <Esp32BoardWizard
+                  value={newEsp32}
+                  format={newFormat}
+                  compact
+                  onChange={setNewEsp32}
+                  onTargetChange={(chip) => setNewChip(chip)}
+                  onFormatChange={setNewFormat}
+                />
+              )}
             </div>
             <div className="flex gap-2 mt-4">
               <button
@@ -333,7 +363,7 @@ function ProjectCard({ project, isActive, onLoad, onExport, onDelete }: {
           </div>
           <div>
             <div className={cn('text-sm font-semibold leading-tight', isDark ? 'text-white' : 'text-slate-800')}>{project.name}</div>
-            <div className={cn('text-[10px] mt-0.5', isDark ? 'text-slate-500' : 'text-slate-400')}>{project.target} · {project.format}</div>
+            <div className={cn('text-[10px] mt-0.5', isDark ? 'text-slate-500' : 'text-slate-400')}>{project.esp32 ? `${getEsp32Profile(project.esp32.boardId)?.label ?? project.target} · ` : `${project.target} · `}{project.format}</div>
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">

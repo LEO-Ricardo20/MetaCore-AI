@@ -17,7 +17,7 @@ describe('project lifecycle', () => {
       updatedAt: 2,
     })
 
-    expect(project.schemaVersion).toBe(2)
+    expect(project.schemaVersion).toBe(3)
     expect(project.scheme?.description).toBe('scheme')
     expect(project.codeFiles).toHaveLength(1)
     expect(project.artifacts.code.status).toBe('fresh')

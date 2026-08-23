@@ -27,6 +27,7 @@ MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中�
 
 - [功能亮点](#功能亮点)
 - [产品工作流](#产品工作流)
+- [ESP32 专精](#esp32-专精)
 - [系统架构](#系统架构)
 - [版本状态](#版本状态)
 - [赞助支持](#赞助支持)
@@ -54,6 +55,7 @@ MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中�
 | 模块 | 能力 |
 | --- | --- |
 | 硬件方案 | 芯片选择、GPIO 分配、BOM、接线表和引脚可视化 |
+| ESP32 专精 | 五个常用系列的开发板 profile、正确 board ID / IDF target、Flash/PSRAM/USB/无线能力与 GPIO 约束 |
 | 固件生成 | 为 Arduino、PlatformIO、ESP-IDF 和 STM32CubeIDE 生成模块化 C/C++ 工程 |
 | 外设驱动库 | 内置 SSD1306、DHT、AHT20、WS2812、HC-SR04、蜂鸣器、舵机和 DRV8833 模板 |
 | AI 一致性检查 | 生成代码后自动检查代码与硬件方案是否一致 |
@@ -77,9 +79,32 @@ MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中�
 4. `验证`：一致性、流程图、本地分析、构建、安全和发布检查。
 5. `项目`：项目切换、导入、导出和删除。
 
-当前项目使用 Project Schema v2 和明确的 `ProjectStage`。需求、方案、引脚、代码、流程、本地分析、构建和发布检查都作为带版本的 Artifact 保存；上游变化会把下游结果标为 `stale`，过期结果不能继续显示为已通过。
+当前项目使用 Project Schema v3 和明确的 `ProjectStage`。需求、方案、引脚、代码、流程、本地分析、构建和发布检查都作为带版本的 Artifact 保存；上游变化会把下游结果标为 `stale`，过期结果不能继续显示为已通过。旧项目会在加载时补全 ESP32 默认开发板配置，不需要清除浏览器数据。
 
 完整状态机、stale 传播规则和恢复行为见 [`docs/PRODUCT_WORKFLOW.md`](docs/PRODUCT_WORKFLOW.md)。
+
+## ESP32 专精
+
+v2.4.0 首批覆盖五个常用系列，并把 SoC、模组、开发板和构建标识分开管理：
+
+| 系列 | 默认开发板 | PlatformIO board | ESP-IDF target | 重点能力 |
+| --- | --- | --- | --- | --- |
+| ESP32 | ESP32 Dev Module | `esp32dev` | `esp32` | 成熟生态、Wi-Fi、经典蓝牙/BLE |
+| ESP32-S3 | ESP32-S3-DevKitC-1 N8 | `esp32-s3-devkitc-1` | `esp32s3` | USB、BLE 5、向量指令 |
+| ESP32-C3 | ESP32-C3-DevKitM-1 | `esp32-c3-devkitm-1` | `esp32c3` | 低成本 RISC-V、Wi-Fi、BLE 5 |
+| ESP32-C6 | ESP32-C6-DevKitC-1 | `esp32-c6-devkitc-1` | `esp32c6` | Wi-Fi 6、BLE 5、Thread、Zigbee |
+| ESP32-S2 | ESP32-S2-Saola-1 | `esp32-s2-saola-1` | `esp32s2` | USB OTG、Wi-Fi、无蓝牙 |
+
+新建项目或编辑需求时，ESP32 配置向导会显示模组、Flash、PSRAM、USB、无线协议、分区、上传速度和串口速度。生成前会校验开发板与框架是否兼容，生成后会检查保留、仅输入、启动和 USB 共用 GPIO。PlatformIO 模板不再固定写成 `esp32dev`。
+
+普通用户的推荐顺序是：
+
+```text
+选择开发板/模组 -> 选择框架 -> 确认 Flash/PSRAM/分区 -> 确认上传与串口速度
+-> 输入外设需求 -> 自动规划 GPIO -> 生成代码 -> 构建 -> 烧录/串口监视
+```
+
+五个系列的配置差异、Arduino/PlatformIO/ESP-IDF 实际命令和后续路线见 [`docs/ESP32_SPECIALIZATION.md`](docs/ESP32_SPECIALIZATION.md)。
 
 ## 系统架构
 
@@ -101,9 +126,9 @@ flowchart LR
 
 ## 版本状态
 
-当前版本：**v2.3.1**，发布日期为 `2026-08-19`。
+当前版本：**v2.4.0**，发布日期为 `2026-08-23`。
 
-2.3.1 延续 2.3.0 的完整阶段化工作流，统一主要操作按钮的蓝青到靛蓝视觉规范，改善深色主题层次，修复待处理事项弹层在桌面/移动端超出屏幕的问题，固定 GitHub 入口，并修复生成任务在 Job ID 尚未返回时取消造成的后端竞态。2.3.0 完成了从需求、硬件方案、引脚、BOM、接线到固件、流程、验证和导出的阶段化工作流，统一接入 Session、Job、SSE、取消、重试和产物过期状态，并使用仓库内 ESP32 示例验证真实工程扫描及 PlatformIO 固件构建。确定性 Mock Provider 仅用于生成编排 E2E，不代表真实 DeepSeek 调用；本次真实固件构建也不代表已经向物理开发板烧录。
+2.4.0 增加 ESP32 专精配置层，首批覆盖 ESP32、S3、C3、C6 和 S2，按真实开发板保存 PlatformIO board、ESP-IDF target、Flash、PSRAM、USB、无线、分区和串口配置；生成模板不再写死 `esp32dev`，并新增板卡级 GPIO 校验。完整 Mock 生成已用 ESP32-C3 验证，仓库内经典 ESP32 示例也重新完成真实 PlatformIO 构建。确定性 Mock Provider 不代表真实 DeepSeek 调用，构建成功也不代表已向实体板烧录。
 
 > [!IMPORTANT]
 > MetaCore Studio 生成的是工程建议和参考代码，不是经过认证的量产硬件。请始终根据真实芯片手册和目标开发板复核引脚、电气限制、依赖和固件行为。
@@ -172,7 +197,7 @@ npm run dev
 打开`本地`页面，设置工作区路径并点击`扫描`。分析器可以识别：
 
 - PlatformIO、ESP-IDF、Arduino、STM32CubeIDE 和 CMake 工程
-- ESP32、ESP32-S3、ESP32-C3、STM32F103 和 STM32F4 相关代码
+- ESP32、ESP32-S3、ESP32-C3、ESP32-C6、ESP32-S2、STM32F103 和 STM32F4 相关代码
 - GPIO 定义和常见引脚调用
 - DHT、OLED、WS2812、舵机、电机、I2C、SPI 和 UART 线索
 - Wi-Fi、MQTT、HTTP、WebSocket、BLE、LoRa、Zigbee、Modbus 和 CoAP 线索

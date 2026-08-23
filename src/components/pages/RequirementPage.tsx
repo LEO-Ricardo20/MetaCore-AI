@@ -6,6 +6,7 @@ import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { useChipStore } from '@/store/chipStore'
 import { useThemeStore } from '@/store/themeStore'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
 import PinTable from '@/components/requirement/PinTable'
 import PinDiagram from '@/components/requirement/PinDiagram'
 import BOMTable from '@/components/requirement/BOMTable'
@@ -16,6 +17,8 @@ import { DRIVER_TEMPLATES } from '@/data/driverTemplates'
 import { startGeneration, cancelGeneration } from '@/services/ai/generationCoordinator'
 import GenerationProgress from '@/components/generation/GenerationProgress'
 import { useGenerationStore } from '@/store/generationStore'
+import Esp32BoardWizard from '@/components/esp32/Esp32BoardWizard'
+import { createEsp32ProjectConfig, getDefaultEsp32Profile, getEsp32Profile, isEsp32Target, normalizeEsp32ProjectConfig, validateEsp32ProjectConfig } from '@/services/esp32/esp32Config'
 
 const FORMATS: { value: ProjectFormat; label: string; desc: string }[] = [
   { value: 'espidf', label: 'ESP-IDF', desc: 'CMake' },
@@ -51,6 +54,7 @@ export default function RequirementPage() {
   const [req, setReq] = useState(project?.requirement ?? '')
   const [target, setTarget] = useState<ChipTarget>(project?.target ?? 'ESP32')
   const [format, setFormat] = useState<ProjectFormat>(project?.format ?? 'espidf')
+  const [esp32, setEsp32] = useState<Esp32ProjectConfig>(() => normalizeEsp32ProjectConfig(project?.esp32, project?.target) ?? createEsp32ProjectConfig())
   const [error, setError] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'diagram'>('diagram')
   const [driverPanelOpen, setDriverPanelOpen] = useState(false)
@@ -65,12 +69,31 @@ export default function RequirementPage() {
     )
   }
 
+  function handleTargetChange(chip: ChipTarget) {
+    setTarget(chip)
+    if (!isEsp32Target(chip)) return
+    const next = createEsp32ProjectConfig(getDefaultEsp32Profile(chip))
+    setEsp32(next)
+    const profile = getEsp32Profile(next.boardId)
+    if (profile && !profile.supportedFormats.includes(format)) setFormat(profile.supportedFormats[0])
+  }
+
+  function handleFormatChange(nextFormat: ProjectFormat) {
+    const profile = getEsp32Profile(esp32.boardId)
+    if (isEsp32Target(target) && profile && !profile.supportedFormats.includes(nextFormat)) return
+    setFormat(nextFormat)
+  }
+
   /** 按规范流程启动方案生成或完整流水线。任务由全局协调器持有，路由切换不会中断。 */
   async function handleGenerate(createMode: 'update-current' | 'new-version' = 'update-current') {
     if (isGenerating) { cancelGeneration(); return }
     setError('')
     try {
-      await startGeneration({ requirement: req, target, format, selectedDriverIds: pickedDriverIds, mode: generationMode, createMode })
+      if (isEsp32Target(target)) {
+        const blocking = validateEsp32ProjectConfig(esp32, format).find((issue) => issue.severity === 'error')
+        if (blocking) throw new Error(blocking.message)
+      }
+      await startGeneration({ requirement: req, target, format, esp32: isEsp32Target(target) ? esp32 : undefined, selectedDriverIds: pickedDriverIds, mode: generationMode, createMode })
     } catch (error) {
       setError(String((error as { message?: string })?.message ?? error))
     }
@@ -122,7 +145,7 @@ export default function RequirementPage() {
             {allChips.map(c => (
               <button
                 key={c}
-                onClick={() => setTarget(c)}
+                onClick={() => handleTargetChange(c)}
                 className={cn(
                   'rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all duration-150',
                   target === c
@@ -144,13 +167,14 @@ export default function RequirementPage() {
           </div>
 
           {/* 工程格式 */}
-          <div className="context-card flex gap-1 rounded-[var(--radius-control)] p-1">
+          <div className="context-card flex flex-wrap gap-1 rounded-[var(--radius-control)] p-1">
             {FORMATS.map(f => (
               <button
                 key={f.value}
-                onClick={() => setFormat(f.value)}
+                onClick={() => handleFormatChange(f.value)}
+                disabled={Boolean(isEsp32Target(target) && !getEsp32Profile(esp32.boardId)?.supportedFormats.includes(f.value))}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all duration-150',
+                  'flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-35',
                   format === f.value
                     ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
@@ -213,7 +237,7 @@ export default function RequirementPage() {
           </div>
 
           {/* 生成模式：把系统执行顺序明确呈现给用户 */}
-          <div className="context-card flex items-center gap-1 rounded-[var(--radius-control)] p-1" aria-label="生成模式">
+          <div className="context-card flex flex-wrap items-center gap-1 rounded-[var(--radius-control)] p-1" aria-label="生成模式">
             <button type="button" disabled={isGenerating} onClick={() => setGenerationMode('scheme-only')} className={cn('rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors', generationMode === 'scheme-only' ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>
               仅生成方案
             </button>
@@ -244,6 +268,18 @@ export default function RequirementPage() {
             </button>
           )}
         </div>
+
+        {isEsp32Target(target) && (
+          <div className="mb-4 slide-in-left" style={{ animationDelay: '125ms' }}>
+            <Esp32BoardWizard
+              value={esp32}
+              format={format}
+              onChange={setEsp32}
+              onTargetChange={setTarget}
+              onFormatChange={setFormat}
+            />
+          </div>
+        )}
 
         {/* 加载动画 */}
         <div className="mb-4">

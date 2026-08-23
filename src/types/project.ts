@@ -1,6 +1,7 @@
 import type { ChipTarget, ProjectFormat, PinAssignment, BOMItem, WiringEntry } from './hardware'
+import type { Esp32ProjectConfig } from './esp32'
 
-export const PROJECT_SCHEMA_VERSION = 2
+export const PROJECT_SCHEMA_VERSION = 3
 
 export type ProjectStage =
   | 'draft'
@@ -150,6 +151,8 @@ export interface Project {
   requirement: string
   target: ChipTarget
   format: ProjectFormat
+  /** ESP32 系列项目的具体开发板、存储与工具链配置；旧项目加载时自动补全。 */
+  esp32?: Esp32ProjectConfig
   scheme?: HardwareScheme
   selectedDriverIds?: string[]
   codeFiles: CodeFile[]

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive, History } from 'lucide-react'
+import { BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive, History, CircuitBoard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
 import { APP_RELEASE_DATE, APP_VERSION_LABEL } from '@/config/app'
@@ -13,11 +13,25 @@ const SECTIONS = [
     steps: [
       { title: '配置 AI 服务', desc: '在「设置」页面添加你的 API Key，支持 DeepSeek、硅基流动、通义千问、OpenAI、Ollama。配置完成后点击「测试」验证连接。' },
       { title: '输入硬件需求', desc: '在「方案」页面输入你想要实现的硬件功能。例如：「做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测温湿度」。' },
-      { title: '生成硬件方案', desc: '选择目标芯片（支持预置和自定义芯片）和工程格式（ESP-IDF/Arduino/PlatformIO），点击「生成方案」。AI 基于芯片完整技术规格（引脚/外设/限制）生成精准方案。' },
+      { title: '生成硬件方案', desc: 'ESP32 项目先选择真实开发板/模组，再确认框架、Flash、PSRAM、分区和串口速度。其他芯片继续使用预置或自定义规格。' },
       { title: '生成代码工程', desc: '点击「生成工程代码」，AI 根据方案和芯片规格生成模块化代码，生成后自动进行一致性自检。当方案中包含 SSD1306 OLED 或 DHT 温湿度传感器时，系统会自动注入经验证的驱动模板，代码页顶栏会显示绿色「驱动已注入」标签，生成的驱动代码可直接上板编译。' },
       { title: '导出使用', desc: '点击「导出 ZIP」下载完整工程包，或点击「导出 PDF」获取方案文档。BOM 价格仅供参考。' },
       { title: '自定义芯片', desc: '点击侧边栏「芯片」进入芯片管理，支持三种方式添加自定义芯片：AI 识图（上传 PDF）、AI 助填、手动配置。' },
       { title: '了解更多', desc: '点击侧边栏「关于」查看平台功能特性、技术栈、版权信息及免责声明。' },
+    ],
+  },
+  {
+    id: 'esp32',
+    icon: CircuitBoard,
+    color: 'emerald',
+    title: 'ESP32 专精',
+    steps: [
+      { title: 'ESP32 Dev Module', desc: '经典 ESP32-WROOM-32，PlatformIO board 为 esp32dev，兼容 Arduino 与 ESP-IDF，适合 Wi-Fi、MQTT、经典蓝牙和常规传感器。' },
+      { title: 'ESP32-S3-DevKitC-1 N8', desc: '8MB Flash、无 PSRAM 的 N8 profile，带 USB OTG 与 BLE 5；N8R8/N16R8 必须作为不同模组变体重新选择。' },
+      { title: 'ESP32-C3-DevKitM-1', desc: '低成本 RISC-V Wi-Fi/BLE 5 板卡，PlatformIO board 为 esp32-c3-devkitm-1，适合小型联网节点。' },
+      { title: 'ESP32-C6-DevKitC-1', desc: '支持 Wi-Fi 6、BLE 5、Thread、Zigbee 和 802.15.4；当前本机 PlatformIO 清单只验证 ESP-IDF，不显示 Arduino 已验证。' },
+      { title: 'ESP32-S2-Saola-1', desc: '单核 Wi-Fi + USB OTG，无 Bluetooth；PSRAM 取决于实体模组变体，平台不会自动假定容量。' },
+      { title: 'GPIO 门禁', desc: '生成后检查重复、保留、不可用、仅输入、strapping 与 USB 共用引脚；错误会阻止把方案标为有效。' },
     ],
   },
   {
@@ -85,14 +99,23 @@ const CHANGELOG = [
     date: APP_RELEASE_DATE,
     badge: 'emerald',
       changes: [
-        '视觉：主要操作按钮统一使用项目管理页的蓝青到靛蓝渐变、悬停和阴影规范',
-        '主题：深色模式改为蓝灰石墨底色，并加入工作台、设计、实现、验证和文档的低饱和阶段色调',
-        '修复：待处理事项弹层使用视口自适应定位，桌面和移动端均不会超出屏幕',
-        '修复：生成任务在 Job ID 返回前取消时，后端任务也会立即取消；GitHub 入口固定在侧栏系统区',
-        '工作流：需求、方案、引脚、BOM、接线、固件、流程和验证阶段统一接入 Session、Job 与 SSE',
-      '交互：生成任务支持真实进度、耗时、取消、失败重试、刷新恢复和下游产物过期提示',
-      '本地工程：真实扫描 ESP32 示例并通过白名单入口完成 PlatformIO 固件构建',
-      '交付：统一门禁覆盖 lint、类型检查、单元测试、本地服务、生产构建和浏览器 E2E',
+        'ESP32：首批覆盖 ESP32、S3、C3、C6、S2 五个常用系列和对应官方/常见开发板',
+        '配置：项目保存模组、PlatformIO board、ESP-IDF target、Flash、PSRAM、USB、无线、分区和串口速度',
+        '生成：PlatformIO 模板使用所选开发板 ID，不再把所有系列写成 esp32dev',
+        '校验：新增保留、不可用、仅输入、strapping、USB 共用和重复 GPIO 检查',
+        '修复：移除 ESP32-S3 不存在的 DAC，并区分 N8 与 N8R8/N16R8 存储能力',
+        '兼容：Project Schema 3 自动迁移旧 ESP32 项目，不清除浏览器项目数据',
+        '验证：ESP32-C3 完整 Mock 生成与经典 ESP32 真实 PlatformIO 构建均通过',
+      ],
+  },
+  {
+    version: 'v2.3.1',
+    date: '2026-08-19',
+    badge: 'cyan',
+    changes: [
+      '视觉：主要操作按钮统一使用蓝青到靛蓝规范，深色模式调整为蓝灰石墨层次',
+      '修复：待处理事项弹层适配桌面/移动视口，GitHub 入口固定在侧栏系统区',
+      '修复：关闭生成任务在 Job ID 返回前取消造成的后端竞态',
     ],
   },
   {

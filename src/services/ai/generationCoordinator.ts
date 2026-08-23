@@ -3,17 +3,20 @@ import { useChipStore } from '@/store/chipStore'
 import { useGenerationStore, type GenerationMode, type GenerationStage } from '@/store/generationStore'
 import { useProjectStore } from '@/store/projectStore'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
 import type { HardwareScheme } from '@/types/project'
 import { buildCodegenPrompt, buildFlowPrompt, buildSchemePrompt, buildVerifyPrompt } from './prompts'
 import { parseCodeFiles, parseFlowGraph, parseHardwareScheme, parseVerification } from './validation'
 import { parseTaskContract, taskContractInstruction } from './contracts'
 import type { AIServiceConfig } from '@/types/ai'
+import { isEsp32Target, validateEsp32PinAssignments, validateEsp32ProjectConfig } from '@/services/esp32/esp32Config'
 
 interface StartInput {
   requirement?: string
   target?: ChipTarget
   format?: ProjectFormat
   selectedDriverIds?: string[]
+  esp32?: Esp32ProjectConfig
   mode: GenerationMode
   projectId?: string
   createMode?: 'update-current' | 'new-version'
@@ -236,9 +239,14 @@ export async function startGeneration(input: StartInput) {
       target: input.target ?? 'ESP32',
       format: input.format ?? 'espidf',
       selectedDriverIds: input.selectedDriverIds ?? [],
+      esp32: input.esp32,
     }, input.createMode ?? 'update-current')
   }
   if (!project) throw new Error('请先选择一个项目')
+  if (isEsp32Target(project.target) && project.esp32) {
+    const configError = validateEsp32ProjectConfig(project.esp32, project.format).find((issue) => issue.severity === 'error')
+    if (configError) throw new Error(configError.message)
+  }
   if ((input.mode === 'code-only' || input.mode === 'flow-only') && !project.scheme && input.mode === 'code-only') throw new Error('当前项目还没有硬件方案，请先生成方案')
   if (input.mode === 'flow-only' && !project.codeFiles.length) throw new Error('当前项目还没有工程代码，请先生成代码')
 
@@ -261,14 +269,20 @@ export async function startGeneration(input: StartInput) {
     if (input.mode === 'scheme-only' || input.mode === 'full-generation') {
       activeStage = 'scheme'
       updateStage(run?.id ?? null, 'scheme', 12, '正在分析需求并设计硬件方案', { model: svc.model, provider: svc.provider })
-      const prompt = buildSchemePrompt(project.requirement, project.target, chipSpec)
+      const prompt = buildSchemePrompt(project.requirement, project.target, chipSpec, project.esp32, project.format)
       const schemeContract = await runAgentStage('scheme-generation', svc, [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }], sessionId, signal, parseHardwareScheme, (progress, message) => updateStage(run?.id ?? null, 'scheme', Math.max(12, progress), message, { model: svc.model, provider: svc.provider }))
       useProjectStore.getState().setScheme(schemeContract.data)
       completeStage(run?.id ?? null, 'scheme', '硬件方案已生成')
       activeStage = 'scheme-validation'
       updateStage(run?.id ?? null, 'scheme-validation', 78, '正在校验引脚、电源和外设约束')
       const pinValidation = await runPinValidationJob(project.id, schemeContract.data, sessionId, signal, (progress, message) => updateStage(run?.id ?? null, 'scheme-validation', Math.max(78, progress), message))
-      completeStage(run?.id ?? null, 'scheme-validation', '硬件约束校验通过', { validationResult: pinValidation })
+      const esp32Issues = project.esp32 ? validateEsp32PinAssignments(project.esp32, schemeContract.data.pins) : []
+      const blockingPinIssue = esp32Issues.find((issue) => issue.severity === 'error')
+      if (blockingPinIssue) {
+        useProjectStore.getState().setArtifactStatus('pinMap', 'invalid', blockingPinIssue.code)
+        throw new Error(`${blockingPinIssue.message}（${blockingPinIssue.code}）`)
+      }
+      completeStage(run?.id ?? null, 'scheme-validation', esp32Issues.length ? `硬件约束校验通过，${esp32Issues.length} 项需复核` : '硬件约束校验通过', { validationResult: { ...pinValidation, esp32Issues } })
       project = useProjectStore.getState().getCurrentProject()!
       if (input.mode === 'full-generation') {
         useProjectStore.getState().setGenerating('scheme', false)
@@ -285,7 +299,7 @@ export async function startGeneration(input: StartInput) {
       activeStage = 'code'
       updateStage(run?.id ?? null, 'code', input.mode === 'code-only' ? 12 : 82, '正在根据硬件方案生成模块化工程代码', { model: svc.model, provider: svc.provider })
       const codeProject = useProjectStore.getState().getCurrentProject()!
-      const codePrompt = buildCodegenPrompt(codeProject.scheme!, codeProject.target, codeProject.format, chipSpec)
+      const codePrompt = buildCodegenPrompt(codeProject.scheme!, codeProject.target, codeProject.format, chipSpec, codeProject.esp32)
       const codeContract = await runAgentStage('code-generation', svc, [{ role: 'system', content: codePrompt.system }, { role: 'user', content: codePrompt.user }], sessionId, signal, parseCodeFiles, (progress, message) => updateStage(run?.id ?? null, 'code', Math.max(12, progress), message, { model: svc.model, provider: svc.provider }), 0.15)
       useProjectStore.getState().setCodeFiles(codeContract.data)
       completeStage(run?.id ?? null, 'code', '固件工程已生成')

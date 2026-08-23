@@ -1,7 +1,16 @@
 /** 硬件相关类型定义 — 芯片规格、引脚分配、BOM、接线 */
 
 export type ChipTarget = string
-export const PRESET_CHIPS: string[] = ['ESP32', 'ESP32-S3', 'STM32F103', 'STM32F4', 'STM32F103-KIT']
+export const PRESET_CHIPS: string[] = [
+  'ESP32',
+  'ESP32-S3',
+  'ESP32-C3',
+  'ESP32-C6',
+  'ESP32-S2',
+  'STM32F103',
+  'STM32F4',
+  'STM32F103-KIT',
+]
 
 export type ProjectFormat = 'espidf' | 'arduino' | 'platformio' | 'cubeide'
 

@@ -4,6 +4,8 @@ import { normalizeProject } from './projectLifecycle'
 import { ARTIFACT_KEYS, PIPELINE_STAGES } from './projectLifecycle'
 import type { ArtifactStatus, Project, ProjectStage, StageRunStatus } from '@/types/project'
 import type { ProjectFormat } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
+import { getEsp32Profile, normalizeEsp32ProjectConfig } from '@/services/esp32/esp32Config'
 
 const ARCHIVE_KIND = 'metacore.project'
 const ARCHIVE_SCHEMA_VERSION = 1
@@ -41,6 +43,34 @@ function timestamp(value: unknown, field: string) {
   const result = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(result) || result <= 0) throw new Error(`项目文件时间字段无效：${field}`)
   return result
+}
+
+function parseEsp32Config(value: unknown, target: string): Esp32ProjectConfig | undefined {
+  if (value === undefined) return normalizeEsp32ProjectConfig(undefined, target)
+  if (!isRecord(value)) throw new Error('项目文件字段必须是对象：project.esp32')
+  const optionalString = (candidate: unknown, fallback: string, field: string) => candidate === undefined
+    ? fallback
+    : requiredString(candidate, field, 300)
+  const boardId = requiredString(value.boardId, 'project.esp32.boardId', 160)
+  if (!getEsp32Profile(boardId)) throw new Error(`项目文件包含未知 ESP32 开发板：${boardId}`)
+  const normalized = normalizeEsp32ProjectConfig({ boardId }, target)
+  if (!normalized) return undefined
+  return normalizeEsp32ProjectConfig({
+    ...normalized,
+    family: optionalString(value.family, normalized.family, 'project.esp32.family') as Esp32ProjectConfig['family'],
+    module: optionalString(value.module, normalized.module, 'project.esp32.module'),
+    platformioBoard: optionalString(value.platformioBoard, normalized.platformioBoard, 'project.esp32.platformioBoard'),
+    platformioFramework: optionalString(value.platformioFramework, normalized.platformioFramework, 'project.esp32.platformioFramework') as Esp32ProjectConfig['platformioFramework'],
+    idfTarget: optionalString(value.idfTarget, normalized.idfTarget, 'project.esp32.idfTarget') as Esp32ProjectConfig['idfTarget'],
+    arduinoBoard: value.arduinoBoard === undefined ? normalized.arduinoBoard : requiredString(value.arduinoBoard, 'project.esp32.arduinoBoard', 300),
+    flashSize: optionalString(value.flashSize, normalized.flashSize, 'project.esp32.flashSize'),
+    flashMode: optionalString(value.flashMode, normalized.flashMode, 'project.esp32.flashMode') as Esp32ProjectConfig['flashMode'],
+    psramSize: optionalString(value.psramSize, normalized.psramSize, 'project.esp32.psramSize'),
+    usbMode: optionalString(value.usbMode, normalized.usbMode, 'project.esp32.usbMode'),
+    uploadSpeed: Number.isFinite(Number(value.uploadSpeed)) ? Number(value.uploadSpeed) : normalized.uploadSpeed,
+    monitorSpeed: Number.isFinite(Number(value.monitorSpeed)) ? Number(value.monitorSpeed) : normalized.monitorSpeed,
+    partitionScheme: optionalString(value.partitionScheme, normalized.partitionScheme, 'project.esp32.partitionScheme'),
+  }, target)
 }
 
 function normalizeValidationError(error: unknown, section: string): never {
@@ -97,12 +127,14 @@ function parseProject(value: unknown): Project {
     throw new Error('项目文件包含连线，但没有流程图节点')
   }
 
+  const target = requiredString(value.target, 'project.target', 160)
   const normalized = normalizeProject({
     id: requiredString(value.id, 'project.id', 160),
     name: requiredString(value.name, 'project.name', 300),
     requirement: typeof value.requirement === 'string' ? value.requirement.slice(0, 100_000) : '',
-    target: requiredString(value.target, 'project.target', 160),
+    target,
     format: formatValue as ProjectFormat,
+    esp32: parseEsp32Config(value.esp32, target),
     scheme,
     selectedDriverIds: optionalStringArray(value.selectedDriverIds, 'project.selectedDriverIds', 200),
     codeFiles,

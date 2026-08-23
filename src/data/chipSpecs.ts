@@ -1,6 +1,49 @@
 /** 芯片技术参数静态数据 — 为 AI prompt 提供引脚/外设/限制信息 */
 
 import type { ChipSpec } from '@/types/hardware'
+import { ESP32_BOARD_PROFILES } from './esp32Profiles'
+
+function profileToChipSpec(profile: (typeof ESP32_BOARD_PROFILES)[number]): ChipSpec {
+  const defaults = profile.pinPolicy.defaultPins
+  return {
+    name: profile.target,
+    fullName: profile.module,
+    arch: profile.cpu,
+    flash: `${profile.flashSize} ${profile.flashMode.toUpperCase()}`,
+    sram: `片上 SRAM；PSRAM ${profile.psramSize}`,
+    clockSpeed: profile.cpu.match(/\d+ MHz/)?.[0]?.replace(' ', '') ?? '未知',
+    voltage: '3.3V',
+    gpios: profile.pinPolicy.available.map((pin) => {
+      const altFunctions: string[] = []
+      if (defaults.i2c?.sda === pin) altFunctions.push('I2C_SDA')
+      if (defaults.i2c?.scl === pin) altFunctions.push('I2C_SCL')
+      if (defaults.spi?.mosi === pin) altFunctions.push('SPI_MOSI')
+      if (defaults.spi?.miso === pin) altFunctions.push('SPI_MISO')
+      if (defaults.spi?.sck === pin) altFunctions.push('SPI_SCK')
+      if (defaults.uart?.tx === pin) altFunctions.push('UART_TX')
+      if (defaults.uart?.rx === pin) altFunctions.push('UART_RX')
+      if (profile.pinPolicy.usbPins.includes(pin)) altFunctions.push('USB')
+      return {
+        pin,
+        altFunctions,
+        inputOnly: profile.pinPolicy.inputOnly.includes(pin) || undefined,
+        notes: profile.pinPolicy.strapping.includes(pin) ? 'Strapping 启动配置引脚' : undefined,
+      }
+    }),
+    peripherals: [
+      ...(defaults.i2c ? [{ name: 'I2C0', type: 'I2C' as const, defaultPins: { SDA: defaults.i2c.sda, SCL: defaults.i2c.scl } }] : []),
+      ...(defaults.spi ? [{ name: 'SPI2', type: 'SPI' as const, defaultPins: { MOSI: defaults.spi.mosi, MISO: defaults.spi.miso, CLK: defaults.spi.sck, CS: defaults.spi.cs } }] : []),
+      ...(defaults.uart ? [{ name: 'UART0', type: 'UART' as const, defaultPins: { TX: defaults.uart.tx, RX: defaults.uart.rx } }] : []),
+      ...(profile.pinPolicy.usbPins.length === 2 ? [{ name: 'USB', type: 'USB' as const, defaultPins: { 'D-': profile.pinPolicy.usbPins[0], 'D+': profile.pinPolicy.usbPins[1] } }] : []),
+    ],
+    bootPins: profile.pinPolicy.strapping,
+    restrictions: [
+      ...profile.pinPolicy.reserved.map((group) => `${group.pins.join('/')}：${group.reason}`),
+      ...profile.pinPolicy.adcRestrictions,
+      ...profile.notes,
+    ],
+  }
+}
 
 export const CHIP_SPECS: Record<string, ChipSpec> = {
   'ESP32': {
@@ -61,10 +104,10 @@ export const CHIP_SPECS: Record<string, ChipSpec> = {
 
   'ESP32-S3': {
     name: 'ESP32-S3',
-    fullName: 'ESP32-S3-WROOM-1-N16R8',
+    fullName: 'ESP32-S3-WROOM-1-N8',
     arch: 'Xtensa LX7 双核',
-    flash: '16MB（Quad SPI，GPIO27-32 占用）',
-    sram: '512KB 内部 + 8MB Octal PSRAM（GPIO33-37 占用）',
+    flash: '8MB QIO（DevKitC-1 N8 profile）',
+    sram: '512KB 内部，无 PSRAM（N8 变体）',
     clockSpeed: '240MHz',
     voltage: '3.3V',
     gpios: [
@@ -86,11 +129,15 @@ export const CHIP_SPECS: Record<string, ChipSpec> = {
       { pin: 'GPIO14', altFunctions: ['ADC2_CH3', 'TOUCH14', 'RTC_GPIO14'] },
       { pin: 'GPIO15', altFunctions: ['ADC2_CH4', 'RTC_GPIO15'] },
       { pin: 'GPIO16', altFunctions: ['ADC2_CH5', 'RTC_GPIO16'] },
-      { pin: 'GPIO17', altFunctions: ['ADC2_CH6', 'RTC_GPIO17', 'DAC_1'] },
-      { pin: 'GPIO18', altFunctions: ['ADC2_CH7', 'RTC_GPIO18', 'DAC_2'] },
+      { pin: 'GPIO17', altFunctions: ['ADC2_CH6', 'RTC_GPIO17'] },
+      { pin: 'GPIO18', altFunctions: ['ADC2_CH7', 'RTC_GPIO18'] },
       { pin: 'GPIO19', altFunctions: ['ADC2_CH8', 'RTC_GPIO19', 'USB_D-'], notes: 'USB OTG D-，默认用于 USB-Serial-JTAG，用作 GPIO 需禁用 USB' },
       { pin: 'GPIO20', altFunctions: ['ADC2_CH9', 'RTC_GPIO20', 'USB_D+'], notes: 'USB OTG D+，默认用于 USB-Serial-JTAG，用作 GPIO 需禁用 USB' },
       { pin: 'GPIO21', altFunctions: ['RTC_GPIO21'] },
+      // N8 无 PSRAM 变体在开发板上还引出了 GPIO35-37。
+      { pin: 'GPIO35', altFunctions: ['FSPIIO4'], notes: 'N8 无 PSRAM profile 可用；其他模组变体须重新核对' },
+      { pin: 'GPIO36', altFunctions: ['FSPIIO5'], notes: 'N8 无 PSRAM profile 可用；其他模组变体须重新核对' },
+      { pin: 'GPIO37', altFunctions: ['FSPIIO6'], notes: 'N8 无 PSRAM profile 可用；其他模组变体须重新核对' },
       // ── GPIO38-48：可用（JTAG 默认占用 GPIO39-42，可重映射）──
       { pin: 'GPIO38', altFunctions: ['FSPIWP'], notes: '可用作普通 GPIO' },
       { pin: 'GPIO39', altFunctions: ['FSPICS1', 'JTAG_TCK'], notes: '默认 JTAG TCK，可通过 menuconfig 重映射后用作 GPIO' },
@@ -113,21 +160,25 @@ export const CHIP_SPECS: Record<string, ChipSpec> = {
       { name: 'UART0', type: 'UART', defaultPins: { TX: 'GPIO43', RX: 'GPIO44' } },
       { name: 'UART1', type: 'UART', defaultPins: { TX: 'GPIO17', RX: 'GPIO16' } },
       { name: 'USB', type: 'USB', defaultPins: { 'D+': 'GPIO20', 'D-': 'GPIO19' } },
-      { name: 'DAC1', type: 'DAC', defaultPins: { OUT: 'GPIO17' } },
-      { name: 'DAC2', type: 'DAC', defaultPins: { OUT: 'GPIO18' } },
     ],
     bootPins: ['GPIO0', 'GPIO3', 'GPIO45', 'GPIO46'],
     restrictions: [
-      '【Flash 占用】GPIO27-32 连接内部 16MB Quad Flash，不可用作普通 GPIO',
-      '【PSRAM 占用】GPIO33-37 连接 8MB Octal PSRAM（N16R8 型号），不可用作普通 GPIO',
+      '【板卡变体】当前预置 profile 是 ESP32-S3-DevKitC-1 N8（8MB Flash、无 PSRAM），不得假定 N8R8/N16R8 的 PSRAM',
+      '【Flash/未引出】GPIO26-34 不在当前 DevKitC-1 N8 profile 的普通 GPIO 范围内',
       '【USB 默认】GPIO19/GPIO20 默认用于 USB-Serial-JTAG，如需用作 GPIO 须在 menuconfig 中禁用 USB 外设',
       '【JTAG 默认】GPIO39-42 默认为 JTAG 接口，可在 menuconfig 中将 JTAG 重映射到 USB 后恢复这 4 个引脚',
       '【ADC2 限制】WiFi 启用时 ADC2（GPIO11-20）不可用，建议优先使用 ADC1（GPIO1-10）',
       '【Strapping】GPIO0（下载模式）/ GPIO3（JTAG 使能）/ GPIO45（VDD_SPI）/ GPIO46（ROM 打印）上电期间勿随意拉低',
       '【I2C 重映射】ESP32-S3 的 I2C 可配置到任意 GPIO，无固定引脚限制',
-      '总可用 GPIO：GPIO0-21（22 个）+ GPIO38-48（11 个）= 最多 33 个外部引脚，其中 GPIO19/20 有 USB 冲突',
+      '当前 profile 可用范围：GPIO0-21 与 GPIO35-48；GPIO19/20 与 USB 共用',
     ],
   },
+
+  ...Object.fromEntries(
+    ESP32_BOARD_PROFILES
+      .filter((profile) => !['ESP32', 'ESP32-S3'].includes(profile.target))
+      .map((profile) => [profile.target, profileToChipSpec(profile)]),
+  ),
 
   'STM32F103': {
     name: 'STM32F103',

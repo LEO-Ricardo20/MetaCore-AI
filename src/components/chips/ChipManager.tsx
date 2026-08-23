@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useThemeStore } from '@/store/themeStore'
 import { useChipStore } from '@/store/chipStore'
 import { CHIP_SPECS } from '@/data/chipSpecs'
+import { ESP32_BOARD_PROFILES } from '@/data/esp32Profiles'
 import { cn } from '@/lib/utils'
 import type { ChipSpec } from '@/types/hardware'
 import PdfParseMode from './PdfParseMode'
@@ -17,6 +18,10 @@ import {
   Pencil,
   Trash2,
   X,
+  ExternalLink,
+  HardDrive,
+  Radio,
+  Usb,
 } from 'lucide-react'
 
 /* ---------- 三种添加模式 ---------- */
@@ -47,7 +52,7 @@ export default function ChipManager() {
   const closeMode = () => { setMode(null); setEditingChip(null) }
 
   /* 预置芯片列表 */
-  const presetEntries = Object.values(CHIP_SPECS)
+  const presetEntries = Object.values(CHIP_SPECS).filter((spec) => !spec.name.startsWith('ESP32'))
 
   return (
     <div className="h-full overflow-y-auto">
@@ -77,9 +82,37 @@ export default function ChipManager() {
           </p>
         </div>
 
+        <section className="mb-8 slide-in-left" style={{ animationDelay: '35ms' }}>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div><h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">ESP32 专精库</h2><p className="mt-1 text-xs text-[var(--text-muted)]">按 SoC 系列区分真实开发板、模组和工具链配置，不再把它们混成一个芯片名称。</p></div>
+            <span className="status-badge border border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">5 个常用系列</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {ESP32_BOARD_PROFILES.map((profile) => (
+              <article key={profile.id} className="glass-card flex min-w-0 flex-col gap-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><h3 className="text-sm font-semibold text-[var(--text-primary)]">{profile.target}</h3><p className="mt-0.5 truncate text-[11px] text-[var(--accent-cyan)]">{profile.label}</p></div>
+                  <a href={profile.sourceUrls[0]} target="_blank" rel="noreferrer" title="查看 Espressif 官方资料" aria-label={`查看 ${profile.target} 官方资料`} className="rounded-[var(--radius-control)] p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--accent-cyan)]"><ExternalLink size={13} /></a>
+                </div>
+                <p className="text-xs leading-5 text-[var(--text-secondary)]">{profile.description}</p>
+                <div className="space-y-1.5 text-[11px] text-[var(--text-muted)]">
+                  <p className="flex items-start gap-1.5"><Cpu size={11} className="mt-0.5 shrink-0" /><span>{profile.cpu}</span></p>
+                  <p className="flex items-start gap-1.5"><HardDrive size={11} className="mt-0.5 shrink-0" /><span>{profile.module} · {profile.flashSize} · PSRAM {profile.psramSize}</span></p>
+                  <p className="flex items-start gap-1.5"><Usb size={11} className="mt-0.5 shrink-0" /><span>{profile.usb}</span></p>
+                  <p className="flex items-start gap-1.5"><Radio size={11} className="mt-0.5 shrink-0" /><span>{profile.connectivity.join(' / ')}</span></p>
+                </div>
+                <div className="mt-auto flex flex-wrap gap-1.5 border-t border-[var(--border-subtle)] pt-2 text-[10px]">
+                  <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[var(--text-secondary)]">PIO {profile.platformioId}</span>
+                  <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[var(--text-secondary)]">IDF {profile.idfTarget}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         {/* ---- 模式选择卡片 ---- */}
         {!mode && !editingChip && (
-          <div className="grid grid-cols-3 gap-4 mb-8 slide-in-left" style={{ animationDelay: '50ms' }}>
+          <div className="mb-8 grid grid-cols-1 gap-4 slide-in-left sm:grid-cols-3" style={{ animationDelay: '50ms' }}>
             {MODES.map(m => {
               const c = colorMap[m.color]
               const Icon = m.icon
@@ -142,7 +175,7 @@ export default function ChipManager() {
           <h2 className={cn('text-sm font-semibold mb-3 uppercase tracking-wide', isDark ? 'text-slate-400' : 'text-slate-500')}>
             预置芯片
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             {presetEntries.map(spec => (
               <ChipCard key={spec.name} spec={spec} isDark={isDark} readonly />
             ))}
@@ -164,7 +197,7 @@ export default function ChipManager() {
               <p className="text-xs mt-1">选择上方的模式添加新芯片</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
               {customChips.map(spec => (
                 <ChipCard
                   key={spec.name}

@@ -208,7 +208,7 @@ Tool Registry 已实现审批策略与事件，但前端“显示 diff -> 用户
 - Store 持久化版本为 2，旧项目通过 `normalizeProject` 补齐生命周期字段。
 - 浏览器已有项目不会因升级被清空。
 - `.metacore.json` 外层归档 `schemaVersion` 继续保持 1。
-- 归档内部项目使用 Project Schema v2，并可迁移旧项目字段。
+- 归档内部项目使用 Project Schema v3，并可迁移旧项目字段和补全 ESP32 默认开发板 profile。
 - API Key、AI 服务配置、本地工作区、Session 路径、原始响应和日志不会进入项目归档。
 
 ## 使用建议

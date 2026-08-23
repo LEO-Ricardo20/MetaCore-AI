@@ -13,7 +13,10 @@ import type {
   ProjectRun,
   StageRunStatus,
 } from '@/types/project'
+import { PROJECT_SCHEMA_VERSION } from '@/types/project'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
+import { normalizeEsp32ProjectConfig } from '@/services/esp32/esp32Config'
 import {
   createProjectArtifacts,
   createProjectRun,
@@ -31,6 +34,7 @@ interface ProjectInput {
   target: ChipTarget
   format: ProjectFormat
   selectedDriverIds?: string[]
+  esp32?: Esp32ProjectConfig
 }
 
 export interface ProjectState {
@@ -40,7 +44,7 @@ export interface ProjectState {
   isGeneratingCode: boolean
   isGeneratingFlow: boolean
   selectedFile: string | null
-  createProject: (requirement: string, target: ChipTarget, format: ProjectFormat, selectedDriverIds?: string[]) => Project
+  createProject: (requirement: string, target: ChipTarget, format: ProjectFormat, selectedDriverIds?: string[], esp32?: Esp32ProjectConfig) => Project
   ensureProject: (input: ProjectInput, mode?: ProjectCreateMode) => Project
   createProjectVersion: (label?: string) => Project | null
   importProject: (project: Project) => Project
@@ -77,12 +81,13 @@ function uniqueProjectId(projects: Project[], preferredId: string) {
 function createProjectRecord(input: ProjectInput, source?: Project): Project {
   const now = Date.now()
   const base: Project = {
-    schemaVersion: 2,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     id: createProjectId(),
     name: input.requirement.slice(0, 30) || '未命名项目',
     requirement: input.requirement,
     target: input.target,
     format: input.format,
+    esp32: input.esp32,
     selectedDriverIds: input.selectedDriverIds ?? [],
     codeFiles: source?.codeFiles ?? [],
     flowNodes: source?.flowNodes ?? [],
@@ -130,8 +135,8 @@ export const useProjectStore = create<ProjectState>()(
       isGeneratingFlow: false,
       selectedFile: null,
 
-      createProject: (requirement, target, format, selectedDriverIds) => (
-        get().ensureProject({ requirement, target, format, selectedDriverIds }, 'new-project')
+      createProject: (requirement, target, format, selectedDriverIds, esp32) => (
+        get().ensureProject({ requirement, target, format, selectedDriverIds, esp32 }, 'new-project')
       ),
 
       ensureProject: (input, mode = 'update-current') => {
@@ -163,10 +168,12 @@ export const useProjectStore = create<ProjectState>()(
             const requirementChanged = project.requirement !== input.requirement
             const targetChanged = project.target !== input.target
             const formatChanged = project.format !== input.format
+            const nextEsp32 = normalizeEsp32ProjectConfig(input.esp32, input.target)
+            const esp32Changed = JSON.stringify(project.esp32) !== JSON.stringify(nextEsp32)
             const driversChanged = JSON.stringify(project.selectedDriverIds ?? []) !== JSON.stringify(input.selectedDriverIds ?? [])
             let artifacts = project.artifacts
             if (requirementChanged || driversChanged) artifacts = markArtifactsStale(artifacts, 'requirements')
-            if (targetChanged) artifacts = markArtifactsStale(artifacts, 'target')
+            if (targetChanged || esp32Changed) artifacts = markArtifactsStale(artifacts, 'target')
             if (formatChanged) artifacts = markArtifactsStale(artifacts, 'format')
             if (requirementChanged) artifacts = updateArtifact(artifacts, 'requirements', 'fresh')
             updated = {
@@ -174,6 +181,7 @@ export const useProjectStore = create<ProjectState>()(
               requirement: input.requirement,
               target: input.target,
               format: input.format,
+              esp32: nextEsp32,
               selectedDriverIds: input.selectedDriverIds ?? [],
               currentStage: 'requirements-ready',
               artifacts,
@@ -194,6 +202,7 @@ export const useProjectStore = create<ProjectState>()(
           target: current.target,
           format: current.format,
           selectedDriverIds: current.selectedDriverIds,
+          esp32: current.esp32,
         }, 'new-version')
         if (label) {
           get().saveProject({
@@ -369,7 +378,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'metacore-projects',
-      version: 2,
+      version: 3,
       migrate: (persisted) => {
         const state = persisted as Partial<ProjectState> | undefined
         return {

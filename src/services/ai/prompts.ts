@@ -7,10 +7,12 @@
 
 import type { HardwareScheme } from '@/types/project'
 import type { ChipTarget, ProjectFormat, ChipSpec } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
 import { chipSpecToPromptText, getChipSpec } from '@/data/chipSpecs'
 import { codeTemplateToPromptText } from '@/data/codeTemplates'
 import { matchDriverTemplates, driverTemplatesToPromptText } from '@/data/driverTemplates'
 import { buildCodeContext } from './contextBuilder'
+import { esp32ConfigToPromptText } from '@/services/esp32/esp32Config'
 
 /** prompt 消息对（system + user） */
 export interface PromptPair {
@@ -23,9 +25,10 @@ export interface PromptPair {
 // ─────────────────────────────────────────────
 
 /** 生成硬件方案的 prompt（注入芯片规格，约束引脚分配） */
-export function buildSchemePrompt(requirement: string, target: ChipTarget, customSpec?: ChipSpec): PromptPair {
+export function buildSchemePrompt(requirement: string, target: ChipTarget, customSpec?: ChipSpec, esp32?: Esp32ProjectConfig, format: ProjectFormat = 'espidf'): PromptPair {
   const spec = customSpec ?? getChipSpec(target)
   const chipText = spec ? chipSpecToPromptText(spec) : `目标芯片：${target}（无详细规格数据）`
+  const boardText = esp32 ? esp32ConfigToPromptText(esp32, format) : ''
 
   return {
     system: `你是一位资深嵌入式硬件架构工程师，拥有 15 年 ESP32/STM32 产品设计经验。
@@ -35,6 +38,8 @@ export function buildSchemePrompt(requirement: string, target: ChipTarget, custo
 - 熟知各芯片的启动引脚限制、仅输入引脚、Flash 占用引脚
 
 ${chipText}
+
+${boardText}
 
 ## 硬性约束
 1. 只使用上述规格中列出的 GPIO 引脚，不可编造不存在的引脚
@@ -101,10 +106,11 @@ export const SCHEME_PROMPT = (requirement: string, target: ChipTarget): string =
 // ─────────────────────────────────────────────
 
 /** 生成工程代码的 prompt（注入芯片规格 + 代码模板） */
-export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, format: ProjectFormat, customSpec?: ChipSpec): PromptPair {
+export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, format: ProjectFormat, customSpec?: ChipSpec, esp32?: Esp32ProjectConfig): PromptPair {
   const spec = customSpec ?? getChipSpec(target)
   const chipText = spec ? chipSpecToPromptText(spec) : `目标芯片：${target}`
-  const templateText = codeTemplateToPromptText(format)
+  const templateText = codeTemplateToPromptText(format, esp32)
+  const boardText = esp32 ? esp32ConfigToPromptText(esp32, format) : ''
   const matchedDrivers = matchDriverTemplates(scheme)
   const driverText = driverTemplatesToPromptText(matchedDrivers, format)
 
@@ -117,6 +123,8 @@ export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, f
 - 使用芯片厂商的标准 API，不使用已废弃的接口
 
 ${chipText}
+
+${boardText}
 
 ${templateText}
 

@@ -1,6 +1,7 @@
 /** 各框架代码骨架和最佳实践 — 为 AI 代码生成提供规范参考 */
 
 import type { ProjectFormat } from '@/types/hardware'
+import type { Esp32ProjectConfig } from '@/types/esp32'
 
 /** 代码模板定义 */
 export interface CodeTemplate {
@@ -81,9 +82,56 @@ export const CODE_TEMPLATES: Record<ProjectFormat, CodeTemplate> = {
   },
 }
 
+function flashSizeSdkconfig(size: string) {
+  const normalized = size.toUpperCase().replace(/\s/g, '')
+  return /^\d+MB$/.test(normalized) ? `CONFIG_ESPTOOLPY_FLASHSIZE_${normalized}=y` : ''
+}
+
+/** 返回与所选开发板一致的工程骨架，避免把所有 ESP32 都生成为 esp32dev。 */
+export function getCodeTemplate(format: ProjectFormat, esp32?: Esp32ProjectConfig): CodeTemplate {
+  const base = CODE_TEMPLATES[format]
+  if (!esp32) return base
+
+  if (format === 'platformio') {
+    const environment = esp32.platformioBoard.replace(/[^a-zA-Z0-9_-]/g, '-')
+    const sourceSkeleton = esp32.platformioFramework === 'espidf'
+      ? [{ path: 'src/main.c', template: `#include "freertos/FreeRTOS.h"\n#include "freertos/task.h"\n#include "esp_log.h"\n\nstatic const char *TAG = "main";\n\nvoid app_main(void) {\n    ESP_LOGI(TAG, "系统启动");\n}` }]
+      : base.skeleton.filter((file) => file.path !== 'platformio.ini')
+    return {
+      ...base,
+      description: `PlatformIO ${esp32.platformioFramework} 工程（${esp32.platformioBoard}）`,
+      skeleton: [
+        {
+          path: 'platformio.ini',
+          template: `[env:${environment}]\nplatform = espressif32\nboard = ${esp32.platformioBoard}\nframework = ${esp32.platformioFramework}\nboard_build.flash_mode = ${esp32.flashMode}\nboard_build.partitions = ${esp32.partitionScheme}\nupload_speed = ${esp32.uploadSpeed}\nmonitor_speed = ${esp32.monitorSpeed}\nlib_deps =\n    ; 在此添加库依赖`,
+        },
+        ...sourceSkeleton,
+      ],
+    }
+  }
+
+  if (format === 'espidf') {
+    const sdkconfig = [flashSizeSdkconfig(esp32.flashSize), `CONFIG_ESPTOOLPY_FLASHMODE_${esp32.flashMode.toUpperCase()}=y`].filter(Boolean).join('\n')
+    return {
+      ...base,
+      description: `ESP-IDF v5.x CMake 工程（先执行 idf.py set-target ${esp32.idfTarget}）`,
+      skeleton: [
+        ...base.skeleton,
+        { path: 'sdkconfig.defaults', template: sdkconfig || '# 使用开发板默认 Flash 配置' },
+      ],
+      bestPractices: [
+        `首次配置必须执行 idf.py set-target ${esp32.idfTarget}`,
+        ...base.bestPractices,
+      ],
+    }
+  }
+
+  return base
+}
+
 /** 将代码模板格式化为可注入 AI prompt 的文本 */
-export function codeTemplateToPromptText(format: ProjectFormat): string {
-  const tmpl = CODE_TEMPLATES[format]
+export function codeTemplateToPromptText(format: ProjectFormat, esp32?: Esp32ProjectConfig): string {
+  const tmpl = getCodeTemplate(format, esp32)
   if (!tmpl) return ''
   let text = `## 代码规范参考 (${tmpl.description})\n\n`
   text += `### 文件骨架\n`

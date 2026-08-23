@@ -11,6 +11,7 @@ import {
   type ProjectValidationSummary,
   type StageRunStatus,
 } from '@/types/project'
+import { normalizeEsp32ProjectConfig } from '@/services/esp32/esp32Config'
 
 export const PIPELINE_STAGES: PipelineStage[] = [
   'requirements',
@@ -90,6 +91,7 @@ export function normalizeProject(project: Project | (Partial<Project> & Pick<Pro
     schemaVersion: PROJECT_SCHEMA_VERSION,
     requirement: typeof base.requirement === 'string' ? base.requirement : '',
     selectedDriverIds: base.selectedDriverIds ?? [],
+    esp32: normalizeEsp32ProjectConfig(base.esp32, base.target),
     codeFiles: base.codeFiles ?? [],
     flowNodes: base.flowNodes ?? [],
     flowEdges: base.flowEdges ?? [],

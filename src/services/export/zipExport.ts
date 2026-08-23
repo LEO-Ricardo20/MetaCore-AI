@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import type { CodeFile, Project } from '@/types/project'
 import { createPortableProject } from '@/services/projects/portableProject'
+import { getEsp32Profile } from '@/services/esp32/esp32Config'
 
 export async function exportZip(projectName: string, files: CodeFile[], target?: string, project?: Project): Promise<void> {
   const zip = new JSZip()
@@ -9,8 +10,9 @@ export async function exportZip(projectName: string, files: CodeFile[], target?:
     folder.file(file.path, file.content)
   }
   if (project) {
+    const profile = project.esp32 ? getEsp32Profile(project.esp32.boardId) : undefined
     folder.file('metacore/project.json', JSON.stringify(createPortableProject(project), null, 2))
-    folder.file('metacore/README.md', `# ${project.name}\n\n目标芯片：${project.target}\n工程格式：${project.format}\n\n${project.scheme?.description ?? '尚未生成硬件方案'}\n`)
+    folder.file('metacore/README.md', `# ${project.name}\n\n目标芯片：${project.target}\n${profile ? `开发板：${profile.label}\n模组：${profile.module}\nPlatformIO board：${profile.platformioId}\nESP-IDF target：${profile.idfTarget}\nFlash：${profile.flashSize} ${profile.flashMode.toUpperCase()}\nPSRAM：${profile.psramSize}\n` : ''}工程格式：${project.format}\n\n${project.scheme?.description ?? '尚未生成硬件方案'}\n`)
   }
   
   // 当目标芯片是STM32F103时，包含模板文件

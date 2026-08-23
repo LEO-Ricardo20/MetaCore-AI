@@ -31,6 +31,7 @@ The browser application handles the product interface and AI workflows. An optio
 
 - [Highlights](#highlights)
 - [Architecture](#architecture)
+- [ESP32 Specialization](#esp32-specialization)
 - [Release Status](#release-status)
 - [Sponsor](#sponsor)
 - [Requirements](#requirements)
@@ -54,6 +55,7 @@ The browser application handles the product interface and AI workflows. An optio
 | Area | What it provides |
 | --- | --- |
 | Hardware design | Chip selection, GPIO allocation, BOM, wiring table, and pin visualization |
+| ESP32 specialization | Five board-aware family profiles with correct PlatformIO/IDF targets, storage, USB, radio, and GPIO policy |
 | Firmware generation | Modular C/C++ project generation for Arduino, PlatformIO, ESP-IDF, and STM32CubeIDE |
 | Driver library | Built-in templates for SSD1306, DHT, AHT20, WS2812, HC-SR04, buzzer, servo, and DRV8833 |
 | AI verification | Post-generation consistency checks against the selected hardware scheme |
@@ -82,11 +84,27 @@ flowchart LR
 
 The localhost service provides the local AI proxy and the `本地` workspace boundary. Requirement generation, chip management, code generation, flow graphs, and export can run in the browser, but the local proxy is recommended for AI providers that do not allow browser CORS.
 
+## ESP32 Specialization
+
+Version 2.4.0 separates the SoC family, module, development board, and build identifier instead of treating all of them as a single chip name:
+
+| Family | Default board | PlatformIO board | ESP-IDF target | Main use |
+| --- | --- | --- | --- | --- |
+| ESP32 | ESP32 Dev Module | `esp32dev` | `esp32` | Mature Wi-Fi and Bluetooth ecosystem |
+| ESP32-S3 | ESP32-S3-DevKitC-1 N8 | `esp32-s3-devkitc-1` | `esp32s3` | USB, BLE 5, vector instructions |
+| ESP32-C3 | ESP32-C3-DevKitM-1 | `esp32-c3-devkitm-1` | `esp32c3` | Low-cost RISC-V Wi-Fi/BLE nodes |
+| ESP32-C6 | ESP32-C6-DevKitC-1 | `esp32-c6-devkitc-1` | `esp32c6` | Wi-Fi 6, Thread, Zigbee, BLE 5 |
+| ESP32-S2 | ESP32-S2-Saola-1 | `esp32-s2-saola-1` | `esp32s2` | USB OTG and Wi-Fi without Bluetooth |
+
+The project and requirement screens now expose board, module, Flash, PSRAM, USB, radio, partition, upload-speed, and monitor-speed configuration. Generation rejects unsupported board/framework combinations and validates reserved, unavailable, input-only, strapping, USB-shared, and duplicate GPIO assignments. PlatformIO skeletons use the selected board ID instead of always falling back to `esp32dev`.
+
+See [`docs/ESP32_SPECIALIZATION.md`](docs/ESP32_SPECIALIZATION.md) for the family comparison, practical Arduino/PlatformIO/ESP-IDF setup, sources, and next-stage roadmap.
+
 ## Release Status
 
-Current release: **v2.3.1** (`2026-08-19`)
+Current release: **v2.4.0** (`2026-08-23`)
 
-Version 2.3.1 keeps the complete 2.3.0 staged workflow while standardizing primary actions on the Project Manager's blue-cyan to indigo visual system, improving dark-theme depth, fixing pending-issue popover viewport overflow on desktop/mobile, keeping the GitHub entry visible, and closing a cancellation race before backend Job IDs arrive. Version 2.3.0 completes the staged workflow from requirements, hardware scheme, pins, BOM, and wiring through firmware, flow, verification, and delivery export. It unifies Session, Job, SSE, cancellation, retry, and stale-artifact state, and verifies real workspace scanning plus a PlatformIO firmware build against the repository ESP32 example. The deterministic Mock Provider is used only for orchestration E2E and is not presented as a real DeepSeek call; the successful firmware build also does not imply that a physical board was flashed.
+Version 2.4.0 introduces board-aware ESP32 specialization for ESP32, S3, C3, C6, and S2. Projects now retain the exact PlatformIO board, ESP-IDF target, Flash, PSRAM, USB, radio, partition, upload, and monitor configuration; prompt skeletons no longer hard-code `esp32dev`, and board-level GPIO policy runs after scheme generation. The complete Mock workflow was verified with ESP32-C3, while the repository's classic ESP32 example was scanned and built with the real PlatformIO toolchain. Mock results are not presented as real DeepSeek calls, and a successful build does not imply a physical board was flashed.
 
 > [!IMPORTANT]
 > MetaCore Studio generates engineering suggestions and code, not verified production hardware. Always validate pin assignments, electrical limits, dependencies, and firmware against the actual datasheet and target board.
@@ -146,7 +164,7 @@ Windows users can double-click `start-local.bat` to start both processes. The se
 Open the `本地` page, set a workspace path, and click `扫描`. The analyzer can identify:
 
 - PlatformIO, ESP-IDF, Arduino, STM32CubeIDE, and CMake projects
-- ESP32, ESP32-S3, ESP32-C3, STM32F103, and STM32F4 references
+- ESP32, ESP32-S3, ESP32-C3, ESP32-C6, ESP32-S2, STM32F103, and STM32F4 references
 - GPIO definitions and common pin calls
 - DHT, OLED, WS2812, servo, motor, I2C, SPI, and UART clues
 - Wi-Fi, MQTT, HTTP, WebSocket, BLE, LoRa, Zigbee, Modbus, and CoAP clues

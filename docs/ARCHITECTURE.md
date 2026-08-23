@@ -7,7 +7,7 @@ MetaCore Studio 由 React 浏览器应用和 Node.js localhost 服务组成。�
 ```mermaid
 flowchart LR
     User[用户] --> UI[React + TypeScript UI]
-    UI --> Store[Zustand Project Schema v2]
+    UI --> Store[Zustand Project Schema v3]
     UI --> AIFlow[AI Task Contract + Context Builder]
     UI --> Local[Node.js localhost service]
     Local --> Agent[Internal Agent Runtime]
@@ -52,10 +52,12 @@ src/
 │   ├── flow/            # ReactFlow 和工程问答
 │   ├── local/           # 本地工作区浏览、分析、编辑和构建
 │   ├── project/         # 项目列表与归档
+│   ├── esp32/           # ESP32 开发板配置向导与 profile 摘要
 │   └── settings/        # AI 服务配置
 ├── services/
 │   ├── ai/              # Provider 客户端、Prompt、Contract、上下文和验证
 │   ├── local/           # localhost API 和 SSE 客户端
+│   ├── esp32/           # 板卡配置规范化、工具链与 GPIO 校验
 │   └── projects/        # 生命周期和可移植项目归档
 ├── store/               # Zustand 持久化与会话状态
 ├── types/               # Project、Agent、AI 和硬件共享类型
@@ -70,7 +72,7 @@ src/
 - 项目导入必须先经过 `portableProject.ts` 可信边界。
 - 页面按钮和一键流水线复用同一套 AI workflow service，不在组件中复制 Provider 调用与解析逻辑。
 
-## Project Schema v2
+## Project Schema v3
 
 `src/types/project.ts` 定义统一领域模型：
 
@@ -81,8 +83,9 @@ src/
 - `ProjectVersion`：显式创建的项目版本。
 - `ProjectValidationSummary`：项目质量门禁。
 - `TokenUsage`：输入、输出、总 Token 和可选费用估算。
+- `Esp32ProjectConfig`：ESP32 SoC、模组、开发板、构建标识、存储、USB、分区和串口配置。
 
-Zustand `metacore-projects` 的持久化版本升级为 2。迁移只补齐缺少的生命周期字段，不清空旧 localStorage。
+Zustand `metacore-projects` 的持久化版本升级为 3。迁移会补齐生命周期字段，并为旧 ESP32 项目推断兼容的默认开发板 profile，不清空旧 localStorage。
 
 详细行为见 [PRODUCT_WORKFLOW.md](./PRODUCT_WORKFLOW.md)。
 
