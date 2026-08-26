@@ -239,6 +239,8 @@ The detailed setup and troubleshooting guide is [`docs/HARNESS_USER_GUIDE.md`](d
 9. Export the ZIP firmware project or PDF design document.
 10. After changing requirements, chips, pins, or code, rerun the affected generation and verification steps. Treat older artifacts as stale until they are checked again.
 
+Consistency, security, build, and release results are saved in the current project, so they remain available after leaving the page or refreshing the browser. If PlatformIO, ESP-IDF, or CMake is not installed, local build verification is shown as skippable and does not block release checks or export of an already generated project.
+
 ## Example Project
 
 The repository includes a small PlatformIO example for local analysis:

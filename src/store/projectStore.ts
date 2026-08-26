@@ -68,6 +68,7 @@ export interface ProjectState {
   finishPipeline: (runId: string, status: Extract<StageRunStatus, 'succeeded' | 'failed' | 'cancelled'>) => void
   retryPipeline: (runId: string, fromStage: PipelineStage) => void
   saveProject: (updates: Partial<Project>) => void
+  saveVerification: (verification: Project['verification']) => void
   reset: () => void
 }
 
@@ -104,6 +105,7 @@ function createProjectRecord(input: ProjectInput, source?: Project): Project {
     runs: [],
     versions: source?.versions ?? [],
     validation: source?.validation ?? { status: 'unchecked', issueCount: 0, blockingCount: 0 },
+    verification: source?.verification,
     createdAt: now,
     updatedAt: now,
   }
@@ -409,6 +411,11 @@ export const useProjectStore = create<ProjectState>()(
 
       saveProject: (updates) => set((state) => {
         const result = updateCurrentProject(state, updates)
+        return result ? { projects: result.projects } : state
+      }),
+
+      saveVerification: (verification) => set((state) => {
+        const result = updateCurrentProject(state, (project) => ({ ...project, verification }))
         return result ? { projects: result.projects } : state
       }),
 

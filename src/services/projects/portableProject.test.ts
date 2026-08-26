@@ -80,4 +80,18 @@ describe('portable project files', () => {
     expect(parsed.versions[0].label).toBe('Review')
     expect(parsed.runs[0].stages[0].status).toBe('succeeded')
   })
+
+  it('round-trips persisted verification summaries', () => {
+    const withVerification = {
+      ...project,
+      verification: {
+        consistency: { status: 'passed' as const, findings: [], updatedAt: 1_700_000_000_300 },
+        build: { status: 'idle' as const, profiles: [], error: '没有本地构建配置', updatedAt: 1_700_000_000_301 },
+      },
+    }
+    const parsed = parsePortableProject(serializePortableProject(withVerification))
+    expect(parsed.verification?.consistency?.status).toBe('passed')
+    expect(parsed.verification?.build?.profiles).toEqual([])
+    expect(parsed.verification?.build?.error).toBe('没有本地构建配置')
+  })
 })

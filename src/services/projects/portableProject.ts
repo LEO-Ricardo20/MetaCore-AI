@@ -200,6 +200,27 @@ function parseProject(value: unknown): Project {
       updatedAt: Number.isFinite(Number(value.validation.updatedAt)) ? Number(value.validation.updatedAt) : undefined,
     }
   }
+  if (isRecord(value.verification)) {
+    const verification = value.verification
+    const statusValues = new Set(['idle', 'running', 'passed', 'warning', 'failed'])
+    const buildStatusValues = new Set([...statusValues, 'skipped'])
+    const parseStatus = (candidate: unknown) => statusValues.has(String(candidate)) ? String(candidate) as 'idle' | 'running' | 'passed' | 'warning' | 'failed' : 'idle'
+    const parseBuildStatus = (candidate: unknown) => buildStatusValues.has(String(candidate)) ? String(candidate) as 'idle' | 'running' | 'passed' | 'warning' | 'failed' | 'skipped' : 'idle'
+    const parseUpdatedAt = (candidate: unknown) => Number.isFinite(Number(candidate)) ? Number(candidate) : Date.now()
+    if (isRecord(verification.consistency) && Array.isArray(verification.consistency.findings)) {
+      normalized.verification = { ...normalized.verification, consistency: { status: parseStatus(verification.consistency.status), findings: verification.consistency.findings.slice(0, 300).filter(isRecord).map((item) => ({ severity: item.severity === 'error' || item.severity === 'warning' ? item.severity : 'info', message: typeof item.message === 'string' ? item.message.slice(0, 500) : '', file: typeof item.file === 'string' ? item.file.slice(0, 300) : undefined, line: Number.isFinite(Number(item.line)) ? Number(item.line) : undefined, expected: typeof item.expected === 'string' ? item.expected.slice(0, 300) : undefined, actual: typeof item.actual === 'string' ? item.actual.slice(0, 300) : undefined })), updatedAt: parseUpdatedAt(verification.consistency.updatedAt) } }
+    }
+    if (isRecord(verification.security) && Array.isArray(verification.security.findings)) {
+      normalized.verification = { ...normalized.verification, security: { status: parseStatus(verification.security.status), findings: verification.security.findings.slice(0, 300).filter(isRecord).map((item) => ({ severity: item.severity === 'error' ? 'error' : 'warning', message: typeof item.message === 'string' ? item.message.slice(0, 500) : '', file: typeof item.file === 'string' ? item.file.slice(0, 300) : '', line: Number.isFinite(Number(item.line)) ? Number(item.line) : 0 })), updatedAt: parseUpdatedAt(verification.security.updatedAt) } }
+    }
+    if (isRecord(verification.build) && Array.isArray(verification.build.profiles)) {
+      const result = isRecord(verification.build.result) ? { profileId: String(verification.build.result.profileId ?? ''), command: String(verification.build.result.command ?? ''), exitCode: Number(verification.build.result.exitCode) || 0, success: Boolean(verification.build.result.success), timedOut: Boolean(verification.build.result.timedOut), durationMs: Number(verification.build.result.durationMs) || 0, stdout: String(verification.build.result.stdout ?? '').slice(-20_000), stderr: String(verification.build.result.stderr ?? '').slice(-20_000), truncated: Boolean(verification.build.result.truncated) } : undefined
+      normalized.verification = { ...normalized.verification, build: { status: parseBuildStatus(verification.build.status), profiles: verification.build.profiles.slice(0, 20).filter(isRecord).map((item) => ({ id: String(item.id ?? ''), label: String(item.label ?? '').slice(0, 160), command: String(item.command ?? '').slice(0, 300), available: Boolean(item.available) })), result, error: typeof verification.build.error === 'string' ? verification.build.error.slice(0, 1_000) : undefined, updatedAt: parseUpdatedAt(verification.build.updatedAt) } }
+    }
+    if (isRecord(verification.release) && Array.isArray(verification.release.reasons)) {
+      normalized.verification = { ...normalized.verification, release: { status: parseStatus(verification.release.status), reasons: verification.release.reasons.slice(0, 100).map((item) => String(item).slice(0, 500)), checkedAt: Number.isFinite(Number(verification.release.checkedAt)) ? Number(verification.release.checkedAt) : undefined, updatedAt: parseUpdatedAt(verification.release.updatedAt) } }
+    }
+  }
   return normalized
 }
 

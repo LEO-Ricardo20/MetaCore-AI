@@ -118,4 +118,16 @@ describe('project store', () => {
     expect(project.runs[0].status).toBe('running')
     expect(project.runs[0].stages.find((stage) => stage.id === 'scheme-generation')?.retryCount).toBe(1)
   })
+
+  it('persists verification results on the canonical project', () => {
+    useProjectStore.getState().createProject('Weather station', 'ESP32', 'platformio')
+    useProjectStore.getState().saveVerification({
+      consistency: { status: 'passed', findings: [], updatedAt: 1_700_000_000_300 },
+      build: { status: 'idle', profiles: [], error: '没有本地构建配置', updatedAt: 1_700_000_000_301 },
+    })
+
+    const project = useProjectStore.getState().getCurrentProject()!
+    expect(project.verification?.consistency?.status).toBe('passed')
+    expect(project.verification?.build?.error).toBe('没有本地构建配置')
+  })
 })

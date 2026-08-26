@@ -107,6 +107,32 @@ export interface ProjectValidationSummary {
   updatedAt?: number
 }
 
+export interface ProjectVerificationState {
+  consistency?: {
+    status: 'idle' | 'running' | 'passed' | 'warning' | 'failed'
+    findings: Array<{ severity: 'error' | 'warning' | 'info'; message: string; file?: string; line?: number; expected?: string; actual?: string }>
+    updatedAt: number
+  }
+  security?: {
+    status: 'idle' | 'running' | 'passed' | 'warning' | 'failed'
+    findings: Array<{ severity: 'error' | 'warning'; message: string; file: string; line: number }>
+    updatedAt: number
+  }
+  build?: {
+    status: 'idle' | 'running' | 'passed' | 'warning' | 'failed' | 'skipped'
+    profiles: Array<{ id: string; label: string; command: string; available: boolean }>
+    result?: { profileId: string; command: string; exitCode: number; success: boolean; timedOut: boolean; durationMs: number; stdout: string; stderr: string; truncated: boolean }
+    error?: string
+    updatedAt: number
+  }
+  release?: {
+    status: 'idle' | 'running' | 'passed' | 'warning' | 'failed'
+    reasons: string[]
+    checkedAt?: number
+    updatedAt: number
+  }
+}
+
 export interface HardwareScheme {
   description: string
   pins: PinAssignment[]
@@ -179,6 +205,7 @@ export interface Project {
   runs: ProjectRun[]
   versions: ProjectVersion[]
   validation: ProjectValidationSummary
+  verification?: ProjectVerificationState
   /** 最近一次生成暂停时要求用户补充的结构化问题。 */
   pendingClarification?: AITaskClarification
   /** 用户已确认的器件选型，在方案重新生成时作为明确约束。 */

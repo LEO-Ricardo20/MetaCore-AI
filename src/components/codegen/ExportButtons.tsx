@@ -7,10 +7,16 @@ export default function ExportButtons() {
   const [zipping, setZipping] = useState(false)
   const [pdffing, setPdffing] = useState(false)
   const [markdowning, setMarkdowning] = useState(false)
-  const requiredArtifacts = ['scheme', 'pinMap', 'bom', 'wiring', 'code', 'flow', 'consistencyReport', 'buildResult', 'releaseReport'] as const
+  const requiredArtifacts = ['scheme', 'pinMap', 'bom', 'wiring', 'code', 'flow', 'consistencyReport', 'releaseReport'] as const
+  const staleArtifacts = project
+    ? Object.entries(project.artifacts).some(([key, artifact]) => {
+      if (key === 'buildResult' && project.verification?.build?.status === 'skipped') return false
+      return artifact.status === 'stale' || artifact.status === 'invalid'
+    })
+    : false
   const blockedReason = !project
     ? '当前没有项目'
-    : Object.values(project.artifacts).some((artifact) => artifact.status === 'stale' || artifact.status === 'invalid')
+    : staleArtifacts
       ? '存在过期或无效产物，请先重新生成并验证'
       : requiredArtifacts.some((key) => !['fresh', 'valid'].includes(project.artifacts[key].status))
         ? '发布检查尚未通过，请先完成验证工作区的所有检查'

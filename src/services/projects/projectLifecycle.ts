@@ -100,6 +100,7 @@ export function normalizeProject(project: Project | (Partial<Project> & Pick<Pro
     runs: Array.isArray(base.runs) ? base.runs : [],
     versions: Array.isArray(base.versions) ? base.versions : [],
     validation: base.validation ?? { status: 'unchecked', issueCount: 0, blockingCount: 0 },
+    verification: base.verification,
   }
 }
 

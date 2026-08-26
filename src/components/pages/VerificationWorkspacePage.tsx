@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   CircleDashed,
   FileSearch,
@@ -90,22 +91,51 @@ export default function VerificationWorkspacePage() {
   const [releaseReasons, setReleaseReasons] = useState<string[]>([])
   const [releaseCheckedAt, setReleaseCheckedAt] = useState<number>()
   const [notice, setNotice] = useState('')
+  const verification = project?.verification
+  const consistencyArtifactStatus = project?.artifacts.consistencyReport.status
+  const codeArtifactStatus = project?.artifacts.code.status
+  const buildArtifactStatus = project?.artifacts.buildResult.status
+  const releaseArtifactStatus = project?.artifacts.releaseReport.status
 
-  const staleArtifacts = useMemo(() => project ? Object.entries(project.artifacts).filter(([, value]) => value.status === 'stale' || value.status === 'invalid') : [], [project])
+  const staleArtifacts = useMemo(() => project ? Object.entries(project.artifacts).filter(([key, value]) => {
+    if (key === 'buildResult' && verification?.build?.status === 'skipped') return false
+    return value.status === 'stale' || value.status === 'invalid'
+  }) : [], [project, verification])
 
   useEffect(() => {
-    setConsistencyState('idle'); setSecurityState('idle'); setBuildState('idle'); setReleaseState('idle')
-    setConsistencyFindings([]); setSecurityFindings([]); setReleaseReasons([]); setBuildResult(null); setBuildError('')
-  }, [project?.id])
+    const consistencyStale = ['stale', 'invalid'].includes(consistencyArtifactStatus ?? '')
+    const codeStale = ['stale', 'invalid'].includes(codeArtifactStatus ?? '')
+    const buildStale = ['stale', 'invalid'].includes(buildArtifactStatus ?? '')
+    const releaseStale = ['stale', 'invalid'].includes(releaseArtifactStatus ?? '')
+    setConsistencyState(consistencyStale ? 'idle' : verification?.consistency?.status ?? 'idle')
+    setSecurityState(codeStale ? 'idle' : verification?.security?.status ?? 'idle')
+    setBuildState(buildStale || verification?.build?.status === 'skipped' ? 'idle' : verification?.build?.status ?? 'idle')
+    setReleaseState(releaseStale ? 'idle' : verification?.release?.status ?? 'idle')
+    setConsistencyFindings(consistencyStale ? [] : verification?.consistency?.findings ?? [])
+    setSecurityFindings(codeStale ? [] : verification?.security?.findings ?? [])
+    setBuildProfiles((verification?.build?.profiles ?? []) as BuildProfile[])
+    setBuildResult(buildStale ? null : (verification?.build?.result ?? null) as BuildResult | null)
+    setBuildError(buildStale ? '' : verification?.build?.error ?? '')
+    setReleaseReasons(releaseStale ? [] : verification?.release?.reasons ?? [])
+    setReleaseCheckedAt(releaseStale ? undefined : verification?.release?.checkedAt)
+    setNotice('')
+  }, [project?.id, verification, consistencyArtifactStatus, codeArtifactStatus, buildArtifactStatus, releaseArtifactStatus])
 
   function setArtifact(key: ArtifactKey, status: 'valid' | 'invalid' | 'fresh' | 'stale') { useProjectStore.getState().setArtifactStatus(key, status) }
+
+  function saveVerificationPart<K extends keyof NonNullable<Project['verification']>>(key: K, value: NonNullable<Project['verification']>[K]) {
+    const current = useProjectStore.getState().getCurrentProject()?.verification ?? {}
+    useProjectStore.getState().saveVerification({ ...current, [key]: value })
+  }
 
   function handleConsistency() {
     if (!project) { navigate('/design/requirements'); return }
     setConsistencyState('running'); setNotice('')
+    saveVerificationPart('consistency', { status: 'running', findings: consistencyFindings, updatedAt: Date.now() })
     window.setTimeout(() => {
       const findings = runConsistencyCheck(project); const failed = findings.some((item) => item.severity === 'error')
       setConsistencyFindings(findings); setConsistencyState(failed ? 'failed' : findings.some((item) => item.severity === 'warning') ? 'warning' : 'passed'); setArtifact('consistencyReport', failed ? 'invalid' : 'valid')
+      saveVerificationPart('consistency', { status: failed ? 'failed' : findings.some((item) => item.severity === 'warning') ? 'warning' : 'passed', findings, updatedAt: Date.now() })
       setNotice(failed ? '一致性校验发现阻断问题' : findings.some((item) => item.severity === 'warning') ? '一致性校验完成，但有提示' : '一致性校验通过')
     }, 260)
   }
@@ -113,35 +143,60 @@ export default function VerificationWorkspacePage() {
   function handleSecurity() {
     if (!project) { navigate('/design/requirements'); return }
     setSecurityState('running'); setNotice('')
+    saveVerificationPart('security', { status: 'running', findings: securityFindings, updatedAt: Date.now() })
     window.setTimeout(() => {
       const findings = runSecurityCheck(project); const failed = findings.some((item) => item.severity === 'error')
       setSecurityFindings(findings); setSecurityState(failed ? 'failed' : findings.length ? 'warning' : 'passed'); setNotice(failed ? '安全检查发现阻断问题' : findings.length ? '安全检查完成，但有提示' : '未发现硬编码凭据')
+      saveVerificationPart('security', { status: failed ? 'failed' : findings.length ? 'warning' : 'passed', findings, updatedAt: Date.now() })
     }, 260)
   }
 
   async function handleDetectBuild() {
     setBuildState('running'); setBuildError(''); setNotice('')
-    try { const result = await detectBuildProfiles(); setBuildProfiles(result.profiles); setBuildState('idle'); if (!result.profiles.length) setBuildError('当前工作区没有识别到受支持的构建配置') }
-    catch (error) { setBuildState('failed'); setBuildError(error instanceof Error ? error.message : '无法检测构建环境') }
+    saveVerificationPart('build', { status: 'running', profiles: buildProfiles.map(({ id, label, command, available }) => ({ id, label, command, available })), updatedAt: Date.now() })
+    try {
+      const result = await detectBuildProfiles()
+      const profiles = result.profiles.map(({ id, label, command, available }) => ({ id, label, command, available }))
+      setBuildProfiles(result.profiles); setBuildState('idle')
+      const error = result.profiles.length ? '' : '当前工作区没有识别到受支持的构建配置。请在“本地分析”中设置包含 platformio.ini、sdkconfig 或 CMakeLists.txt 的工程目录。'
+      setBuildError(error)
+      saveVerificationPart('build', { status: result.profiles.length ? 'idle' : 'skipped', profiles, error: error || undefined, result: buildResult ?? undefined, updatedAt: Date.now() })
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : '无法检测构建环境'
+      setBuildState('failed'); setBuildError(message)
+      saveVerificationPart('build', { status: 'failed', profiles: buildProfiles.map(({ id, label, command, available }) => ({ id, label, command, available })), error: message, result: buildResult ?? undefined, updatedAt: Date.now() })
+    }
   }
 
   async function handleBuild(profileId: string) {
     setBuildState('running'); setBuildError(''); setBuildResult(null); setNotice('')
-    try { const result = await runBuild(profileId); setBuildResult(result); setBuildState(result.success ? 'passed' : 'failed'); setArtifact('buildResult', result.success ? 'valid' : 'invalid'); setNotice(result.success ? '构建验证通过' : `构建未通过（退出码 ${result.exitCode}）`) }
-    catch (error) { setBuildState('failed'); setBuildError(error instanceof Error ? error.message : '构建执行失败'); setArtifact('buildResult', 'invalid') }
+    saveVerificationPart('build', { status: 'running', profiles: buildProfiles.map(({ id, label, command, available }) => ({ id, label, command, available })), updatedAt: Date.now() })
+    try {
+      const result = await runBuild(profileId)
+      setBuildResult(result); setBuildState(result.success ? 'passed' : 'failed'); setArtifact('buildResult', result.success ? 'valid' : 'invalid'); setNotice(result.success ? '构建验证通过' : `构建未通过（退出码 ${result.exitCode}）`)
+      saveVerificationPart('build', { status: result.success ? 'passed' : 'failed', profiles: buildProfiles.map(({ id, label, command, available }) => ({ id, label, command, available })), result, updatedAt: Date.now() })
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : '构建执行失败'
+      setBuildState('failed'); setBuildError(message); setArtifact('buildResult', 'invalid')
+      saveVerificationPart('build', { status: 'failed', profiles: buildProfiles.map(({ id, label, command, available }) => ({ id, label, command, available })), error: message, updatedAt: Date.now() })
+    }
   }
 
   function handleRelease() {
     if (!project) { navigate('/design/requirements'); return }
-    const reasons: string[] = []; const required: Array<[ArtifactKey, string]> = [['scheme', '硬件方案'], ['pinMap', '引脚映射'], ['bom', 'BOM'], ['wiring', '接线'], ['code', '固件工程'], ['flow', '流程图'], ['consistencyReport', '一致性报告'], ['buildResult', '构建结果']]
+    const reasons: string[] = []; const required: Array<[ArtifactKey, string]> = [['scheme', '硬件方案'], ['pinMap', '引脚映射'], ['bom', 'BOM'], ['wiring', '接线'], ['code', '固件工程'], ['flow', '流程图'], ['consistencyReport', '一致性报告']]
     required.forEach(([key, label]) => { const status = project.artifacts[key].status; if (status !== 'valid' && status !== 'fresh') reasons.push(`${label}状态为“${statusLabel(status)}”`) })
+    if (verification?.build?.status !== 'skipped' && project.artifacts.buildResult.status !== 'valid' && project.artifacts.buildResult.status !== 'fresh') reasons.push(`构建结果状态为“${statusLabel(project.artifacts.buildResult.status)}”`)
     if (securityFindings.some((item) => item.severity === 'error')) reasons.push('安全检查存在阻断级问题')
     if (staleArtifacts.length) reasons.push(`存在 ${staleArtifacts.length} 个过期或无效产物`)
     setReleaseReasons(reasons); setReleaseCheckedAt(Date.now()); setReleaseState(reasons.length ? 'failed' : 'passed'); setArtifact('releaseReport', reasons.length ? 'invalid' : 'valid'); setNotice(reasons.length ? '发布检查被阻断，请先处理下方问题' : '发布检查通过，可以导出交付物')
+    saveVerificationPart('release', { status: reasons.length ? 'failed' : 'passed', reasons, checkedAt: Date.now(), updatedAt: Date.now() })
   }
 
   const topState: CheckState = staleArtifacts.length ? 'warning' : project?.validation.status === 'passed' ? 'passed' : 'idle'
-  return <div className="h-full overflow-y-auto"><div className="page-container tone-verification"><div className="workspace-header flex flex-wrap items-end justify-between gap-3"><div><div className="workspace-eyebrow"><ShieldAlert size={13} /> Verification Trajectory</div><h1 className="workspace-title">质量门禁</h1><p className="workspace-subtitle">按顺序运行一致性、安全、构建和发布检查，所有证据、耗时和阻断原因都保留在当前项目上下文中。</p></div>{staleArtifacts.length ? <PendingIssuesMenu project={project} /> : <StatusBadge state={topState} label="等待验证" />}</div><nav className="stage-tabs mb-5" aria-label="验证阶段">{tabs.map(([key, label, Icon]) => <button key={key} type="button" className={cn('stage-tab', active === key && 'stage-tab-active')} onClick={() => navigate(`/verification/${key}`)}><Icon size={14} />{label}</button>)}</nav>{notice && <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--surface-selected)] px-3 py-2 text-xs text-[var(--text-primary)]"><CheckCircle2 size={14} className="text-[var(--accent-cyan)]" />{notice}</div>}{!project ? <EmptyProject onNavigate={() => navigate('/design/requirements')} /> : active === 'flow' ? <FlowPage /> : active === 'local' ? <LocalWorkspacePage /> : active === 'consistency' ? <ConsistencyPanel project={project} state={consistencyState} findings={consistencyFindings} onRun={handleConsistency} onNavigate={() => navigate('/implementation/code')} /> : active === 'build' ? <BuildPanel project={project} state={buildState} profiles={buildProfiles} result={buildResult} error={buildError} onDetect={handleDetectBuild} onRun={handleBuild} /> : active === 'security' ? <SecurityPanel project={project} state={securityState} findings={securityFindings} onRun={handleSecurity} onNavigate={() => navigate('/implementation/code')} /> : <ReleasePanel state={releaseState} reasons={releaseReasons} checkedAt={releaseCheckedAt} onRun={handleRelease} onNavigate={(path) => navigate(path)} />}</div></div>
+  return <div className="h-full overflow-y-auto"><div className="page-container tone-verification"><div className="workspace-header flex flex-wrap items-end justify-between gap-3"><div><div className="workspace-eyebrow"><ShieldAlert size={13} /> Verification Trajectory</div><h1 className="workspace-title">质量门禁</h1><p className="workspace-subtitle">按顺序运行一致性、安全、构建和发布检查，所有结果和阻断原因都会保存到当前项目。</p></div>{staleArtifacts.length ? <PendingIssuesMenu project={project} /> : <StatusBadge state={topState} label="等待验证" />}</div><nav className="stage-tabs mb-5" aria-label="验证阶段">{tabs.map(([key, label, Icon]) => <button key={key} type="button" className={cn('stage-tab', active === key && 'stage-tab-active')} onClick={() => navigate(`/verification/${key}`)}><Icon size={14} />{label}</button>)}</nav>{notice && <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--surface-selected)] px-3 py-2 text-xs text-[var(--text-primary)]"><CheckCircle2 size={14} className="text-[var(--accent-cyan)]" />{notice}</div>}{!project ? <EmptyProject onNavigate={() => navigate('/design/requirements')} /> : active === 'flow' ? <FlowPage /> : active === 'local' ? <LocalWorkspacePage /> : active === 'consistency' ? <ConsistencyPanel project={project} state={consistencyState} findings={consistencyFindings} onRun={handleConsistency} onNavigate={() => navigate('/implementation/code')} /> : active === 'build' ? <BuildPanel project={project} state={buildState} profiles={buildProfiles} result={buildResult} error={buildError} onDetect={handleDetectBuild} onRun={handleBuild} onNavigate={() => navigate('/verification/local')} /> : active === 'security' ? <SecurityPanel project={project} state={securityState} findings={securityFindings} onRun={handleSecurity} onNavigate={() => navigate('/implementation/code')} /> : <ReleasePanel state={releaseState} reasons={releaseReasons} checkedAt={releaseCheckedAt} onRun={handleRelease} onNavigate={(path) => navigate(path)} />}</div></div>
 }
 
 function StatusBadge({ state, label }: { state: CheckState; label: string }) {
@@ -169,8 +224,8 @@ function SecurityPanel({ project, state, findings, onRun, onNavigate }: { projec
   return <PanelShell title="安全与依赖风险" description="扫描项目代码中的硬编码凭据、私钥和外部 API 线索；结果只保留脱敏后的文件与行号。" state={state} action={<ActionBar state={state} label="运行安全检查" onRun={onRun} disabled={!project.codeFiles.length} />}><div className="grid gap-3 md:grid-cols-3"><Metric label="扫描文件" value={project.codeFiles.length} /><Metric label="阻断问题" value={findings.filter((item) => item.severity === 'error').length} /><Metric label="提示" value={findings.filter((item) => item.severity === 'warning').length} /></div>{!project.codeFiles.length ? <EmptyHint text="需要先生成固件工程，才能扫描源码风险。" action="去生成代码" onClick={onNavigate} /> : findings.length ? <div className="mt-4 space-y-2">{findings.map((item, index) => <Finding key={`${item.message}-${index}`} severity={item.severity} message={item.message} file={item.file} line={item.line} />)}</div> : <EmptyHint text="尚未执行检查。运行后这里会列出凭据、私钥和外部地址风险。" />}</PanelShell>
 }
 
-function BuildPanel({ project, state, profiles, result, error, onDetect, onRun }: { project: Project; state: CheckState; profiles: BuildProfile[]; result: BuildResult | null; error: string; onDetect: () => void; onRun: (id: string) => void }) {
-  return <PanelShell title="白名单构建验证" description="仅执行本地服务检测到的 profileId，不接受前端传入任意命令。工具链缺失时明确显示不可用。" state={state} action={<ActionBar state={state} label="检测构建环境" onRun={onDetect} />}><div className="mb-4 flex items-center justify-between text-xs text-[var(--text-secondary)]"><span>目标：{project.target} · {project.format}</span><button type="button" onClick={onDetect} disabled={state === 'running'} className="inline-flex items-center gap-1 text-cyan-700 hover:text-cyan-500 dark:text-cyan-300"><RefreshCw size={12} />重新检测</button></div>{error && <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-300"><AlertCircle size={14} className="mt-0.5 shrink-0" />{error}</div>}{profiles.length ? <div className="space-y-2">{profiles.map((profile) => <div key={profile.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"><div className="min-w-0"><p className="text-sm font-medium text-[var(--text-primary)]">{profile.label}</p><p className="mt-1 truncate font-mono text-[11px] text-[var(--text-muted)]">{profile.command}</p></div><button type="button" disabled={!profile.available || state === 'running'} onClick={() => onRun(profile.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-700 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-cyan-300"><Play size={12} />{profile.available ? '运行构建' : '工具不可用'}</button></div>)}</div> : <EmptyHint text="尚未检测构建环境。检测后会列出可执行 profile 和工具链状态。" />}{result && <div className={cn('mt-4 rounded-lg border p-3', result.success ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10')}><div className="flex items-center justify-between gap-2 text-xs"><span className={result.success ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}>{result.success ? '构建成功' : `构建失败 · 退出码 ${result.exitCode}`}</span><span className="text-[var(--text-muted)]">{(result.durationMs / 1000).toFixed(1)}s</span></div><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] text-[var(--text-secondary)]">{[result.stdout, result.stderr].filter(Boolean).join('\n') || '无构建输出'}</pre></div>}</PanelShell>
+function BuildPanel({ project, state, profiles, result, error, onDetect, onRun, onNavigate }: { project: Project; state: CheckState; profiles: BuildProfile[]; result: BuildResult | null; error: string; onDetect: () => void; onRun: (id: string) => void; onNavigate: () => void }) {
+  return <PanelShell title="白名单构建验证" description="仅执行本地服务检测到的 profileId，不接受前端传入任意命令。工具链缺失时明确显示不可用。" state={state} action={<ActionBar state={state} label="检测构建环境" onRun={onDetect} />}><div className="mb-4 flex items-center justify-between text-xs text-[var(--text-secondary)]"><span>目标：{project.target} · {project.format}</span><button type="button" onClick={onDetect} disabled={state === 'running'} className="inline-flex items-center gap-1 text-cyan-700 hover:text-cyan-500 dark:text-cyan-300"><RefreshCw size={12} />重新检测</button></div>{error && <div className="mb-3 flex flex-wrap items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span className="min-w-0 flex-1">{error}</span>{!profiles.length && <button type="button" onClick={onNavigate} className="inline-flex shrink-0 items-center gap-1 font-semibold text-cyan-700 hover:underline dark:text-cyan-300">去本地分析 <ArrowRight size={12} /></button>}</div>}{profiles.length ? <div className="space-y-2">{profiles.map((profile) => <div key={profile.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"><div className="min-w-0"><p className="text-sm font-medium text-[var(--text-primary)]">{profile.label}</p><p className="mt-1 truncate font-mono text-[11px] text-[var(--text-muted)]">{profile.command}</p></div><button type="button" disabled={!profile.available || state === 'running'} onClick={() => onRun(profile.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-700 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-cyan-300"><Play size={12} />{profile.available ? '运行构建' : '工具不可用'}</button></div>)}</div> : <EmptyHint text="尚未检测构建环境。点击“检测构建环境”后会保存检测结果；如果仍为空，请先在本地分析中选择正确的工程目录。" />}{result && <div className={cn('mt-4 rounded-lg border p-3', result.success ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10')}><div className="flex items-center justify-between gap-2 text-xs"><span className={result.success ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}>{result.success ? '构建成功' : `构建失败 · 退出码 ${result.exitCode}`}</span><span className="text-[var(--text-muted)]">{(result.durationMs / 1000).toFixed(1)}s</span></div><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] text-[var(--text-secondary)]">{[result.stdout, result.stderr].filter(Boolean).join('\n') || '无构建输出'}</pre></div>}</PanelShell>
 }
 
 function ReleasePanel({ state, reasons, checkedAt, onRun, onNavigate }: { state: CheckState; reasons: string[]; checkedAt?: number; onRun: () => void; onNavigate: (path: string) => void }) {
