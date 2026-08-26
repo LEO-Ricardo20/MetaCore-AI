@@ -40,6 +40,53 @@ function parseAIJSON(text: string, label: string) {
   return value
 }
 
+function scalarText(value: unknown) {
+  return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
+}
+
+function flattenPinMapping(value: unknown, path: string[] = [], output: Array<{ key: string; group: string; pin: string }> = []) {
+  if (isRecord(value)) {
+    for (const [key, child] of Object.entries(value)) flattenPinMapping(child, [...path, key], output)
+    return output
+  }
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => flattenPinMapping(child, [...path, String(index + 1)], output))
+    return output
+  }
+  const pin = scalarText(value)
+  if (pin && path.length) output.push({ key: path[path.length - 1], group: path.slice(0, -1).join(' / '), pin })
+  return output
+}
+
+function normalizeHardwareSchemeData(data: Record<string, unknown>) {
+  const normalized: Record<string, unknown> = { ...data }
+  if (!Array.isArray(normalized.pins) && isRecord(normalized.pinMapping)) {
+    normalized.pins = flattenPinMapping(normalized.pinMapping).map(({ key, group, pin }) => ({
+      pinNumber: pin,
+      pinName: key,
+      function: group || key,
+      connectedTo: group || key,
+      voltage: /12v|5v|3v3|vdd|gnd/i.test(`${key} ${pin}`) ? pin : '3.3V',
+    }))
+  }
+  if (Array.isArray(normalized.bom)) {
+    normalized.bom = normalized.bom.map((item) => isRecord(item) ? {
+      ...item,
+      model: item.model ?? item.package ?? item.partNumber ?? item.name,
+      unitPrice: Number.isFinite(Number(item.unitPrice)) ? Number(item.unitPrice) : 0,
+    } : item)
+  }
+  if (isRecord(normalized.wiring)) {
+    normalized.wiring = Object.entries(normalized.wiring).map(([from, value]) => ({
+      from,
+      to: scalarText(value) || JSON.stringify(value),
+      note: '由 AI 返回的分组接线说明，生成后请按原理图复核。',
+    }))
+  }
+  normalized.description = normalized.description ?? normalized.summary ?? normalized.overview ?? normalized.architecture ?? '硬件方案已生成，详细架构见引脚分配、BOM 和接线数据。'
+  return normalized
+}
+
 function normalizeGeneratedPath(value: unknown) {
   const raw = requiredString(value, 'files[].path', 260).replace(/\\/g, '/')
   const parts = raw.split('/').filter((part) => part && part !== '.')
@@ -56,7 +103,7 @@ function normalizeGeneratedPath(value: unknown) {
 }
 
 export function parseHardwareScheme(text: string): HardwareScheme {
-  const data = parseAIJSON(text, '硬件方案')
+  const data = normalizeHardwareSchemeData(parseAIJSON(text, '硬件方案'))
   const pins = arrayField(data.pins, 'pins', 160).map((value, index) => {
     const item = objectField(value, `pins[${index}]`)
     return {

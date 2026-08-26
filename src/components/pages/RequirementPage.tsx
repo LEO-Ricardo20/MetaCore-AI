@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
+import { useAIConfigStore } from '@/store/aiConfigStore'
 import { useChipStore } from '@/store/chipStore'
 import { useThemeStore } from '@/store/themeStore'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
@@ -47,6 +48,7 @@ export default function RequirementPage() {
   const { getAllChipNames } = useChipStore()
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
+  const structuredGenerationService = useAIConfigStore((state) => state.getStructuredGenerationService())
 
   // 合并预置 + 自定义芯片列表
   const allChips = getAllChipNames()
@@ -244,6 +246,15 @@ export default function RequirementPage() {
             <button type="button" disabled={isGenerating} onClick={() => setGenerationMode('full-generation')} className={cn('rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors', generationMode === 'full-generation' ? 'bg-[var(--surface-selected)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-medium)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>
               完整生成
             </button>
+          </div>
+
+          <div className="flex min-w-0 flex-1 items-center gap-2 px-1 text-[11px] text-[var(--text-secondary)]">
+            <Info size={13} className="flex-shrink-0 text-[var(--accent-cyan)]" />
+            <span className="truncate">
+              {structuredGenerationService
+                ? `结构化生成将使用：${structuredGenerationService.name} · ${structuredGenerationService.model}`
+                : '请先在设置页测试并启用官方 DeepSeek 或硅基流动 DeepSeek'}
+            </span>
           </div>
 
           {/* 生成按钮 */}

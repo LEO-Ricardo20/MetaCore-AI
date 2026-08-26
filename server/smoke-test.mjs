@@ -78,6 +78,12 @@ async function startMockAIProvider() {
       return
     }
 
+    if (req.url?.includes('/gateway-timeout/')) {
+      res.writeHead(504, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'upstream request timeout' } }))
+      return
+    }
+
     if (req.url?.includes('/slow/')) {
       await new Promise((resolve) => setTimeout(resolve, 2_000))
     }
@@ -227,15 +233,39 @@ try {
   assert.equal(missingKey.res.status, 400)
   assert.match(missingKey.data.error, /API Key/)
 
-  const chatAI = await request('/ai/call', {
+  const chatAI = await requestRaw('/ai/call', {
     method: 'POST',
+    headers: { Origin: 'http://127.0.0.1:5173' },
     body: JSON.stringify({
       service: { provider: 'deepseek', apiKey: 'smoke-key', baseURL: `http://127.0.0.1:${mockAIPort}/v1`, model: 'deepseek-chat' },
       messages: [{ role: 'user', content: 'test chat completions' }],
       temperature: 0,
     }),
   })
-  assert.equal(chatAI.content, 'CHAT_OK')
+  assert.equal(chatAI.res.status, 200)
+  assert.equal(chatAI.res.headers.get('access-control-allow-origin'), 'http://127.0.0.1:5173')
+  assert.equal(chatAI.data.content, 'CHAT_OK')
+
+  const normalizedEndpointAI = await request('/ai/call', {
+    method: 'POST',
+    body: JSON.stringify({
+      service: { provider: 'deepseek', apiKey: 'smoke-key', baseURL: `http://127.0.0.1:${mockAIPort}/v1/chat/completions`, model: 'deepseek-chat' },
+      messages: [{ role: 'user', content: 'normalize a full endpoint' }],
+    }),
+  })
+  assert.equal(normalizedEndpointAI.content, 'CHAT_OK')
+
+  const reasoningAI = await request('/ai/call', {
+    method: 'POST',
+    body: JSON.stringify({
+      service: { provider: 'deepseek', apiKey: 'smoke-key', baseURL: `http://127.0.0.1:${mockAIPort}/v1`, model: 'deepseek-reasoner', maxOutputTokens: 1024 },
+      messages: [{ role: 'user', content: 'reason without sampling controls' }],
+      temperature: 0.7,
+    }),
+  })
+  assert.equal(reasoningAI.content, 'CHAT_OK')
+  assert.equal(mockAIRequests.at(-1).body.temperature, undefined)
+  assert.equal(mockAIRequests.at(-1).body.max_tokens, 1024)
 
   const responsesAI = await request('/ai/call', {
     method: 'POST',
@@ -255,6 +285,61 @@ try {
     }),
   })
   assert.equal(customResponsesAI.content, 'OPENAI_OK')
+
+  const structuredModelJob = await request('/jobs', {
+    method: 'POST',
+    body: JSON.stringify({
+      projectId: 'smoke-project',
+      sessionId: session.id,
+      stage: 'scheme-generation',
+      payload: {
+        service: { provider: 'deepseek', apiKey: 'smoke-key', baseURL: `http://127.0.0.1:${mockAIPort}/v1`, model: 'deepseek-v4-flash' },
+        messages: [{ role: 'user', content: 'structured model fallback' }],
+        taskType: 'hardware-scheme',
+      },
+    }),
+  })
+  let structuredModelResult = structuredModelJob
+  for (let attempt = 0; attempt < 50 && structuredModelResult.status !== 'succeeded'; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    structuredModelResult = await request(`/jobs/${structuredModelJob.id}`)
+  }
+  assert.equal(structuredModelResult.status, 'succeeded')
+  assert.equal(mockAIRequests.at(-1).body.model, 'deepseek-chat')
+
+  const portAwarePinJob = await request('/jobs', {
+    method: 'POST',
+    body: JSON.stringify({
+      projectId: 'smoke-project',
+      sessionId: session.id,
+      stage: 'scheme-validation',
+      payload: { pins: [{ pin: 'PA12', name: 'ENABLE' }, { pin: 'PB12', name: 'CAN_STBY' }] },
+    }),
+  })
+  let portAwarePinResult = portAwarePinJob
+  for (let attempt = 0; attempt < 50 && portAwarePinResult.status !== 'succeeded'; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    portAwarePinResult = await request(`/jobs/${portAwarePinJob.id}`)
+  }
+  assert.equal(portAwarePinResult.status, 'succeeded')
+  assert.equal(portAwarePinResult.result.valid, true)
+
+  const duplicatePinJob = await request('/jobs', {
+    method: 'POST',
+    body: JSON.stringify({
+      projectId: 'smoke-project',
+      sessionId: session.id,
+      stage: 'scheme-validation',
+      payload: { pins: [{ pin: 'PA12', name: 'ENABLE' }, { pin: 'PA12', name: 'CAN_TX' }] },
+    }),
+  })
+  let duplicatePinResult = duplicatePinJob
+  for (let attempt = 0; attempt < 50 && duplicatePinResult.status !== 'failed'; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    duplicatePinResult = await request(`/jobs/${duplicatePinJob.id}`)
+  }
+  assert.equal(duplicatePinResult.status, 'failed')
+  assert.equal(duplicatePinResult.errorCode, 'PIN_CONFLICT')
 
   const slowJob = await request('/jobs', {
     method: 'POST',
@@ -303,13 +388,27 @@ try {
   })
   assert.equal(unavailable.res.status, 503)
   assert.equal(unavailable.data.error, 'No available providers')
+
+  const upstreamTimeout = await requestRaw('/ai/call', {
+    method: 'POST',
+    body: JSON.stringify({
+      service: { provider: 'custom', apiKey: 'smoke-key', baseURL: `http://127.0.0.1:${mockAIPort}/gateway-timeout`, model: 'slow-model' },
+      messages: [{ role: 'user', content: 'test upstream timeout' }],
+    }),
+  })
+  assert.equal(upstreamTimeout.res.status, 504)
+  assert.equal(upstreamTimeout.data.code, 'AI_TIMEOUT')
   assert.deepEqual(mockAIRequests.map((item) => item.url), [
+    '/v1/chat/completions',
+    '/v1/chat/completions',
     '/v1/chat/completions',
     '/v1/responses',
     '/v1/responses',
+    '/v1/chat/completions',
     '/v1/models',
     '/rate-limit/chat/completions',
     '/unavailable/chat/completions',
+    '/gateway-timeout/chat/completions',
   ])
   assert.ok(mockAIRequests.every((item) => item.authorization === 'Bearer smoke-key'))
   const logs = await request('/logs')

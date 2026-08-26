@@ -6,6 +6,47 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+### Added
+
+- Added an AI hardware candidate flow with four user-visible categories: most common, optimal match, best value, and best overall.
+- Added a 0-100 preference allocation view with a strict 100-point total, AI auto-selection, candidate cards, safety notes, and one-click generation from confirmed selections.
+
+### Safety
+
+- Candidate ranking now treats electrical compatibility, derating, thermal/current headroom, documentation completeness, lifecycle, and supply stability as hard gates before cost or performance preferences.
+- Confirmed models, selection weights, rationale, and safety summary remain attached to the project for later regeneration and review.
+
+### Changed
+
+- Updated the visible release version to `v2.5.0-harness.2` and refreshed the in-app user-facing release notes.
+- Slider edits now automatically rebalance the other preference categories so the allocation remains exactly 100 points.
+- Hardware generation now has an application-level model preflight: generic requirements pause for model candidates before any BOM or pin plan is generated.
+- Candidate requests include the user's current per-question answer, so voltage, current, environment, and known-part details reach the AI selection prompt.
+
+### Harness Integration
+
+- Integrated the `v2.5.0-harness.1` Harness refactor preview based on DeepSeek Harness `dsh-v0.1.1-rc.2`.
+- Added the selectable DeepSeek Harness Runtime, Cordis composition, stdio JSON-RPC adapter, session trajectory events, MetaCore bridge tools, file Diff approvals, build approvals, task cancellation/retry, build-failure Agent entry point, Runtime settings status, and the Harness migration/user guides.
+- Preserved the MetaCore workspace boundary, backups, modification-time conflict checks, build allowlist, and final approval as the authority for high-risk actions.
+- Added visible per-provider request timeout and maximum output-token controls to AI service settings.
+
+### Security and Operations
+
+- Unified browser AI traffic through the localhost MetaCore gateway by default; browser-direct fallback now requires the explicit `VITE_METACORE_ALLOW_DIRECT_AI=true` development override.
+- DeepSeek Harness tasks now reuse the active, verified DeepSeek service's API key, Base URL, model, and output budget. `DEEPSEEK_API_KEY` remains an optional server-side fallback.
+- Increased the default provider request timeout from 90 to 180 seconds and allowed a bounded 30-to-600-second UI setting.
+
+### Documentation
+
+- Reworked the Chinese and English README prose, normalized inline UI labels and code formatting, and added an author's note describing the project's origin and its relationship to IterXAI.
+- Updated Harness, security, and local API documentation to describe the integrated Runtime rather than the earlier two-directory migration state.
+
+### Fixed
+
+- Fixed the hard-coded “90 seconds” message that could disagree with the real timeout.
+- Preserved actionable AI error codes for authentication, missing endpoints/models, rate limits, upstream failures, connection failures, cancellation, and timeouts through the Job layer.
+- Normalized full `/chat/completions`, `/responses`, and `/models` URLs pasted into Base URL fields, and stopped sending `temperature` to reasoning-model routes that reject sampling controls.
+
 ## [2.4.0] - 2026-08-23
 
 ### Added
@@ -55,7 +96,7 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 ### Added
 
 - Added the Project Schema v2 lifecycle model, artifact freshness propagation, pipeline run metadata, and explicit project version support.
-- Added the internal Harness-inspired Agent Runtime with static plugin/service/tool registries, background jobs, cancellation, retry, SSE events, sessions, and redacted JSONL trajectories.
+- Added the internal, Harness-inspired Agent Runtime with static plugin/service/tool registries, background jobs, cancellation, retry, SSE events, sessions, and redacted JSONL trajectories.
 - Added versioned AI Task Contracts and budgeted, relevance-scored code context selection for flow and consistency tasks.
 - Added product workflow, Agent architecture, security model, local API, and portable project format documentation.
 - Added deterministic browser workflow coverage plus a real ESP32 PlatformIO workspace smoke test.

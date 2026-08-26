@@ -12,6 +12,7 @@ import type {
   Project,
   ProjectRun,
   StageRunStatus,
+  HardwareModelSelection,
 } from '@/types/project'
 import { PROJECT_SCHEMA_VERSION } from '@/types/project'
 import type { ChipTarget, ProjectFormat } from '@/types/hardware'
@@ -35,6 +36,7 @@ interface ProjectInput {
   format: ProjectFormat
   selectedDriverIds?: string[]
   esp32?: Esp32ProjectConfig
+  modelSelection?: HardwareModelSelection
 }
 
 export interface ProjectState {
@@ -52,6 +54,8 @@ export interface ProjectState {
   loadProject: (id: string) => void
   getCurrentProject: () => Project | null
   setScheme: (scheme: HardwareScheme) => void
+  setPendingClarification: (clarification: Project['pendingClarification']) => void
+  clearPendingClarification: () => void
   setCodeFiles: (files: CodeFile[]) => void
   setFlowData: (nodes: FlowNode[], edges: FlowEdge[]) => void
   setSelectedFile: (path: string) => void
@@ -59,6 +63,7 @@ export interface ProjectState {
   setSelectedDriverIds: (ids: string[]) => void
   setArtifactStatus: (key: ArtifactKey, status: ArtifactStatus, staleReason?: string) => void
   startPipeline: (fromStage?: PipelineStage, sessionId?: string) => ProjectRun | null
+  pausePipelineForClarification: (runId: string, message: string) => void
   updatePipelineStage: (runId: string, stage: PipelineStage, updates: Partial<PipelineStageState>) => void
   finishPipeline: (runId: string, status: Extract<StageRunStatus, 'succeeded' | 'failed' | 'cancelled'>) => void
   retryPipeline: (runId: string, fromStage: PipelineStage) => void
@@ -89,6 +94,7 @@ function createProjectRecord(input: ProjectInput, source?: Project): Project {
     format: input.format,
     esp32: input.esp32,
     selectedDriverIds: input.selectedDriverIds ?? [],
+    modelSelection: input.modelSelection,
     codeFiles: source?.codeFiles ?? [],
     flowNodes: source?.flowNodes ?? [],
     flowEdges: source?.flowEdges ?? [],
@@ -171,8 +177,9 @@ export const useProjectStore = create<ProjectState>()(
             const nextEsp32 = normalizeEsp32ProjectConfig(input.esp32, input.target)
             const esp32Changed = JSON.stringify(project.esp32) !== JSON.stringify(nextEsp32)
             const driversChanged = JSON.stringify(project.selectedDriverIds ?? []) !== JSON.stringify(input.selectedDriverIds ?? [])
+            const modelSelectionChanged = JSON.stringify(project.modelSelection ?? null) !== JSON.stringify(input.modelSelection ?? null)
             let artifacts = project.artifacts
-            if (requirementChanged || driversChanged) artifacts = markArtifactsStale(artifacts, 'requirements')
+            if (requirementChanged || driversChanged || modelSelectionChanged) artifacts = markArtifactsStale(artifacts, 'requirements')
             if (targetChanged || esp32Changed) artifacts = markArtifactsStale(artifacts, 'target')
             if (formatChanged) artifacts = markArtifactsStale(artifacts, 'format')
             if (requirementChanged) artifacts = updateArtifact(artifacts, 'requirements', 'fresh')
@@ -183,6 +190,7 @@ export const useProjectStore = create<ProjectState>()(
               format: input.format,
               esp32: nextEsp32,
               selectedDriverIds: input.selectedDriverIds ?? [],
+              modelSelection: input.modelSelection,
               currentStage: 'requirements-ready',
               artifacts,
               validation: validationFromArtifacts(artifacts),
@@ -203,6 +211,7 @@ export const useProjectStore = create<ProjectState>()(
           format: current.format,
           selectedDriverIds: current.selectedDriverIds,
           esp32: current.esp32,
+          modelSelection: current.modelSelection,
         }, 'new-version')
         if (label) {
           get().saveProject({
@@ -251,6 +260,20 @@ export const useProjectStore = create<ProjectState>()(
           artifacts = updateArtifact(artifacts, 'bom', scheme.bom.length ? 'fresh' : 'missing')
           artifacts = updateArtifact(artifacts, 'wiring', scheme.wiring.length ? 'fresh' : 'missing')
           return { ...project, scheme, currentStage: 'design-review', artifacts, validation: validationFromArtifacts(artifacts) }
+        })
+        return result ? { projects: result.projects } : state
+      }),
+
+      setPendingClarification: (pendingClarification) => set((state) => {
+        const result = updateCurrentProject(state, (project) => ({ ...project, pendingClarification }))
+        return result ? { projects: result.projects } : state
+      }),
+
+      clearPendingClarification: () => set((state) => {
+        const result = updateCurrentProject(state, (project) => {
+          const next = { ...project }
+          delete next.pendingClarification
+          return next
         })
         return result ? { projects: result.projects } : state
       }),
@@ -326,6 +349,21 @@ export const useProjectStore = create<ProjectState>()(
         })
         return run
       },
+
+      pausePipelineForClarification: (runId, message) => set((state) => {
+        const result = updateCurrentProject(state, (project) => ({
+          ...withRun(project, runId, (run) => ({
+            ...run,
+            status: 'waiting',
+            currentStage: 'clarification',
+            stages: run.stages.map((stage) => stage.id === 'clarification'
+              ? { ...stage, status: 'waiting', progress: 0, currentAction: message, startedAt: undefined, finishedAt: undefined, errorCode: undefined, errorMessage: undefined }
+              : stage),
+          })),
+          currentStage: 'planning',
+        }))
+        return result ? { projects: result.projects } : state
+      }),
 
       updatePipelineStage: (runId, stage, updates) => set((state) => {
         const result = updateCurrentProject(state, (project) => withRun(project, runId, (run) => ({

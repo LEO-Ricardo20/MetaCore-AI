@@ -81,6 +81,9 @@ export default function ServiceCard({ service, onEdit }: Props) {
           <div className={cn('text-[11px] sm:text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-500')}>
             协议：{resolveAIAPIMode(service) === 'responses' ? 'Responses API' : 'Chat Completions'}
           </div>
+          <div className={cn('text-[11px] sm:text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-500')}>
+            超时：{Math.round((service.timeoutMs ?? 180_000) / 1_000)} 秒 · 最大输出：{service.maxOutputTokens ?? 8192} Token
+          </div>
           <div className={cn('flex items-center gap-1.5 text-[11px] mt-1.5', hasCredential ? 'text-emerald-500' : isDark ? 'text-slate-600' : 'text-slate-400')}>
             <KeyRound size={11} />
             {service.provider === 'mock' ? '测试 Mock Provider，不需要 API Key' : service.provider === 'ollama' ? '本地 Ollama 不要求 API Key' : hasCredential ? '已配置 API Key' : '未配置 API Key'}
@@ -142,7 +145,7 @@ export default function ServiceCard({ service, onEdit }: Props) {
             ? <CheckCircle2 size={14} className="flex-shrink-0 mt-0.5" />
             : <XCircle size={14} className="flex-shrink-0 mt-0.5" />}
           <span className="break-all">
-            {testResult.ok ? `连接成功 · ${testResult.via === 'local-proxy' ? '本地代理' : '浏览器直连'}` : testResult.error}
+            {testResult.ok ? `连接成功 · ${testResult.via === 'local-proxy' ? 'MetaCore 本地网关' : '浏览器直连'} · ${testResult.durationMs ?? 0} ms` : testResult.error}
           </span>
         </div>
       )}

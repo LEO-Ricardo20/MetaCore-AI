@@ -1,8 +1,10 @@
-import { AlertCircle, Check, Loader2, RotateCcw, Square } from 'lucide-react'
+import { AlertCircle, Check, Loader2, MessageCircleQuestion, RotateCcw, Square } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cancelGeneration, retryGeneration } from '@/services/ai/generationCoordinator'
 import { useGenerationStore, type GenerationStage } from '@/store/generationStore'
+import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
 import { cn } from '@/lib/utils'
+import ClarificationDialog from './ClarificationDialog'
 
 const labels: Record<GenerationStage, string> = {
   preparing: '准备任务',
@@ -17,8 +19,12 @@ const order: GenerationStage[] = ['scheme', 'scheme-validation', 'code', 'code-v
 
 export default function GenerationProgress({ projectId, compact = false }: { projectId?: string | null; compact?: boolean }) {
   const state = useGenerationStore()
+  const project = useProjectStore(selectCurrentProject)
+  const displayedClarification = state.clarification ?? (projectId && project?.id === projectId ? project.pendingClarification : undefined)
+  const needsClarification = Boolean(displayedClarification) && (state.status === 'needs_clarification' || state.status === 'idle')
   const running = state.status === 'running'
   const [elapsed, setElapsed] = useState(0)
+  const [clarificationOpen, setClarificationOpen] = useState(false)
   useEffect(() => {
     if (!running || !state.startedAt) { setElapsed(0); return }
     const update = () => setElapsed(Math.max(0, Math.floor((Date.now() - state.startedAt!) / 1000)))
@@ -26,23 +32,27 @@ export default function GenerationProgress({ projectId, compact = false }: { pro
     const timer = window.setInterval(update, 1000)
     return () => window.clearInterval(timer)
   }, [running, state.startedAt])
-  if (state.status === 'idle' || (projectId && state.projectId !== projectId)) return null
+  useEffect(() => {
+    if (needsClarification) setClarificationOpen(true)
+  }, [needsClarification])
+  if ((state.status === 'idle' && !needsClarification) || (projectId && state.status !== 'idle' && state.projectId !== projectId)) return null
   const activeIndex = order.indexOf(state.stage)
 
   return (
     <section className={cn('trajectory-panel surface-panel fade-in', compact ? 'p-3' : 'p-5')} aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] border', running ? 'border-[var(--border-medium)] bg-[var(--surface-selected)] text-[var(--accent-cyan)]' : state.status === 'failed' ? 'border-red-500/25 bg-red-500/10 text-red-500' : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500')}>
-            {running ? <Loader2 size={16} className="animate-spin" /> : state.status === 'failed' ? <AlertCircle size={16} /> : <Check size={16} />}
+          <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] border', running ? 'border-[var(--border-medium)] bg-[var(--surface-selected)] text-[var(--accent-cyan)]' : state.status === 'failed' ? 'border-red-500/25 bg-red-500/10 text-red-500' : needsClarification ? 'border-amber-500/30 bg-amber-500/10 text-amber-500' : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500')}>
+            {running ? <Loader2 size={16} className="animate-spin" /> : state.status === 'failed' ? <AlertCircle size={16} /> : needsClarification ? <MessageCircleQuestion size={16} /> : <Check size={16} />}
           </div>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-[var(--text-primary)]">{running ? labels[state.stage] : state.message}</p>{running && <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-0.5 font-mono text-[9px] text-[var(--text-muted)]">RUNNING · {elapsed}s</span>}</div>
-            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">{state.message}</p>
+            <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-[var(--text-primary)]">{running ? labels[state.stage] : needsClarification ? '等待补充信息' : state.message}</p>{running && <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-0.5 font-mono text-[9px] text-[var(--text-muted)]">RUNNING · {elapsed}s</span>}</div>
+            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">{running ? state.message : needsClarification ? '请在对话框中逐项确认硬件约束' : state.message}</p>
           </div>
         </div>
         {running && <button type="button" onClick={cancelGeneration} className="icon-button shrink-0 border border-red-500/20 bg-red-500/5 text-red-500" title="取消生成" aria-label="取消生成"><Square size={14} /></button>}
         {!running && (state.status === 'failed' || state.status === 'cancelled') && <button type="button" onClick={retryGeneration} className="icon-button shrink-0 text-indigo-600 dark:text-indigo-300" title="重试生成" aria-label="重试生成"><RotateCcw size={14} /></button>}
+        {!running && needsClarification && displayedClarification && <button type="button" onClick={() => setClarificationOpen(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-cyan-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500" title="补充信息"><MessageCircleQuestion size={13} />补充信息</button>}
       </div>
 
       <div className="mt-4 grid grid-cols-5 gap-1">
@@ -60,7 +70,9 @@ export default function GenerationProgress({ projectId, compact = false }: { pro
         {(state.sessionId || state.jobId) && <p className="truncate font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Session {state.sessionId?.slice(0, 8) ?? '—'} · Job {state.jobId?.slice(0, 8) ?? 'completed'}</p>}
       </div>
       {state.warning && <p className="mt-3 whitespace-pre-line text-xs text-amber-600">{state.warning}</p>}
+      {needsClarification && displayedClarification && <p className="mt-3 text-xs leading-5 text-amber-600">AI 已暂停在当前阶段，回答问题后会继续，不会把未确认的引脚、电压或执行器参数写进方案。</p>}
       {state.error && state.status === 'failed' && <p className="mt-3 whitespace-pre-line text-xs text-red-600">{state.error}</p>}
+      {needsClarification && displayedClarification && <ClarificationDialog clarification={displayedClarification} open={clarificationOpen} onClose={() => setClarificationOpen(false)} />}
     </section>
   )
 }

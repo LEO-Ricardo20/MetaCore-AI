@@ -1,11 +1,25 @@
-/** AI API 客户端：优先使用 localhost 代理，代理不可用时回退浏览器直连。 */
+/** AI API 客户端：统一通过 MetaCore 本地网关调用，避免浏览器跨域和凭据泄露。 */
 
 import { resolveAIAPIMode, type AIServiceConfig } from '@/types/ai'
 
 const LOCAL_AI_API = 'http://127.0.0.1:3766/api/ai'
-const LOCAL_PROXY_TIMEOUT_MS = 95_000
-const DIRECT_REQUEST_TIMEOUT_MS = 90_000
+const LOCAL_PROXY_TIMEOUT_MS = 190_000
+const DIRECT_REQUEST_TIMEOUT_MS = 180_000
 const MODEL_LIST_TIMEOUT_MS = 35_000
+const CONNECTION_TEST_TIMEOUT_MS = 30_000
+
+const allowDirectAI = import.meta.env.VITE_METACORE_ALLOW_DIRECT_AI === 'true'
+
+function localGatewayUnavailableMessage(action = '调用 AI') {
+  const hostname = typeof window === 'undefined' ? '' : window.location.hostname
+  const origin = typeof window === 'undefined' ? '' : window.location.origin
+  const localPage = ['localhost', '127.0.0.1', '[::1]'].includes(hostname)
+
+  if (origin && !localPage) {
+    return `当前网页来自 ${origin}，出于 API Key 和本地文件安全限制，不能通过它${action}。请改用本机页面 http://127.0.0.1:5173。`
+  }
+  return `MetaCore 本地 AI 网关无法连接。请确认 http://127.0.0.1:3766/api/health 可以打开，并保持 npm run dev:server 正在运行。`
+}
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -18,11 +32,13 @@ export interface CallAIOptions {
   signal?: AbortSignal
   timeoutMs?: number
   retries?: number
+  taskType?: string
 }
 
 export interface AIConnectionResult {
   ok: boolean
   via?: 'local-proxy' | 'direct'
+  durationMs?: number
   error?: string
 }
 
@@ -43,7 +59,9 @@ export class AIRequestCancelledError extends Error {
 }
 
 function normalizeBaseURL(value: string) {
-  return value.trim().replace(/\/+$/, '')
+  const url = new URL(value.trim())
+  url.pathname = url.pathname.replace(/\/(?:chat\/completions|responses|models)\/?$/i, '') || '/'
+  return url.toString().replace(/\/+$/, '')
 }
 
 function providerError(raw: string, status: number) {
@@ -57,6 +75,15 @@ function providerError(raw: string, status: number) {
 
 function requestError(raw: string, status: number, prefix = 'AI 请求失败') {
   const message = providerError(raw, status)
+  if (status === 401 || status === 403) {
+    return new AIRequestError(`AI API Key 无效或无权限（${status}）。请重新填写服务商 API Key，并确认账户有余额或调用权限。原始提示：${message}`, status)
+  }
+  if (status === 404) {
+    return new AIRequestError(`AI 接口或模型不存在（404）。请检查 Base URL 是否只填写到 /v1（不要粘贴完整 /chat/completions），并点击“读取模型”选择平台实际返回的模型。原始提示：${message}`, status)
+  }
+  if (status === 400) {
+    return new AIRequestError(`AI 请求参数被服务商拒绝（400）。请确认 API 协议、模型名称和请求能力匹配；推理模型通常不支持 temperature。原始提示：${message}`, status)
+  }
   if (status === 429 || /\b429\b|rate limit|rate limiting|too busy/i.test(message)) {
     return new AIRequestError(`AI 服务商当前限流或系统繁忙（429）。请稍后重试，检查配额/QPS，或更换模型。原始提示：${message}`, status, true)
   }
@@ -124,6 +151,7 @@ async function retryDelay(attempt: number, signal?: AbortSignal) {
 function authHeaders(service: AIServiceConfig) {
   return {
     'Content-Type': 'application/json',
+    Accept: 'application/json',
     ...(service.apiKey ? { Authorization: `Bearer ${service.apiKey}` } : {}),
   }
 }
@@ -134,14 +162,17 @@ async function callThroughLocalProxy(
   opts: CallAIOptions,
 ) {
   try {
-    return await withRequestTimeout(opts.timeoutMs ?? service.timeoutMs ?? LOCAL_PROXY_TIMEOUT_MS, opts.signal, async (signal) => {
+    const configuredTimeout = opts.timeoutMs ?? service.timeoutMs
+    const timeoutMs = configuredTimeout ? Math.min(610_000, Math.max(5_000, Number(configuredTimeout) + 10_000)) : LOCAL_PROXY_TIMEOUT_MS
+    return await withRequestTimeout(timeoutMs, opts.signal, async (signal) => {
       const response = await fetch(`${LOCAL_AI_API}/call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service,
+          service: opts.timeoutMs ? { ...service, timeoutMs: opts.timeoutMs } : service,
           messages,
           temperature: opts.temperature ?? 0.3,
+          taskType: opts.taskType,
         }),
         signal,
       })
@@ -186,7 +217,7 @@ export async function fetchAIModels(service: AIServiceConfig): Promise<string[]>
   } catch (error) {
     if (error instanceof AIRequestError) throw error
     if (error instanceof TypeError) {
-      throw new Error('本地 AI 代理未启动，无法读取服务商模型列表。请先运行 npm run dev:server。', { cause: error })
+      throw new Error(localGatewayUnavailableMessage('读取服务商模型列表'), { cause: error })
     }
     throw error
   }
@@ -212,6 +243,10 @@ async function invokeAI(
     return { content, via: 'local-proxy' }
   } catch (error) {
     if (!(error instanceof LocalProxyUnavailableError)) throw error
+  }
+
+  if (!allowDirectAI) {
+    throw new AIRequestError(localGatewayUnavailableMessage(), 503, true)
   }
 
   try {
@@ -250,6 +285,7 @@ async function callAIChatCompletionsDirect(
 ): Promise<string> {
   return withRequestTimeout(opts.timeoutMs ?? service.timeoutMs ?? DIRECT_REQUEST_TIMEOUT_MS, opts.signal, async (signal) => {
     const onChunk = opts.onChunk
+    const isReasoningModel = /(?:reasoner|reasoning|deepseek-r1)/i.test(service.model)
     const response = await fetch(`${normalizeBaseURL(service.baseURL)}/chat/completions`, {
       method: 'POST',
       headers: authHeaders(service),
@@ -257,7 +293,7 @@ async function callAIChatCompletionsDirect(
         model: service.model,
         messages,
         stream: Boolean(onChunk),
-        temperature: opts.temperature ?? 0.3,
+        ...(!isReasoningModel ? { temperature: opts.temperature ?? 0.3 } : {}),
       }),
       signal,
     })
@@ -374,17 +410,18 @@ function extractResponsesText(data: any) {
 }
 
 export async function testConnection(service: AIServiceConfig): Promise<AIConnectionResult> {
+  const startedAt = Date.now()
   if (service.provider === 'mock') {
     try {
       const result = await callThroughLocalProxy(service, [{ role: 'user', content: 'Reply with OK only.' }], { temperature: 0, timeoutMs: 5_000 })
-      return { ok: Boolean(result), via: 'local-proxy' }
+      return { ok: Boolean(result), via: 'local-proxy', durationMs: Date.now() - startedAt }
     } catch (error: any) {
       return { ok: false, error: error?.message ?? 'Mock Provider 连接失败，请启动本地服务' }
     }
   }
   try {
-    const result = await invokeAI(service, [{ role: 'user', content: 'Reply with OK only.' }], { temperature: 0 })
-    return { ok: true, via: result.via }
+    const result = await invokeAI(service, [{ role: 'user', content: 'Reply with OK only.' }], { temperature: 0, timeoutMs: CONNECTION_TEST_TIMEOUT_MS, retries: 0 })
+    return { ok: true, via: result.via, durationMs: Date.now() - startedAt }
   } catch (error: any) {
     const message = error?.message ?? '未知连接错误'
     if (/no available providers|没有可用的上游通道/i.test(message)) {

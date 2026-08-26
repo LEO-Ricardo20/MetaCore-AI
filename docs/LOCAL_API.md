@@ -46,14 +46,16 @@ Agent 和新增 API 使用稳定错误格式：
 {
   "ok": true,
   "service": "metacore-studio-local",
-  "version": "2.3.0",
+  "version": "2.5.0-harness.2",
   "workspaceRoot": "D:\\Projects\\Demo",
   "port": 3766,
   "agentRuntime": "internal"
 }
 ```
 
-`agentRuntime` 默认来自 `METACORE_AGENT_RUNTIME=internal`。当前只实现 internal runtime；没有实际 DeepSeek Harness adapter。
+`agentRuntime` 默认来自 `METACORE_AGENT_RUNTIME=deepseek-harness`。服务同时提供 `deepseek-harness` 和 `internal` 两个 Runtime；前者通过配置的 DeepSeek Harness 源码 checkout 和 `@deepseek-ai/dsh-sdk-client` 驱动 Cordis JSON-RPC，后者是本地单轮 AI 回退实现。使用 `GET /api/agent/runtime` 查看源码、依赖、配置和凭据状态。
+
+DeepSeek Harness 的高风险操作不会直接写文件或执行构建。`propose_file_change` 和 `request_build` 会生成审批记录，前端在确认 Diff/构建 profile 后调用审批接口，MetaCore 才执行已有的安全写入或白名单构建。
 
 ### `GET /system/info`
 
@@ -288,7 +290,9 @@ Job 队列当前为进程内状态，服务重启后不能继续轮询旧 Job。
 }
 ```
 
-成功响应除 `content` 外，还可包含 model、provider、apiMode、durationMs、usage 和 contextLength。单次请求默认超时 90 秒；外部 AbortSignal 对应 `AI_CANCELLED`，超时对应 `AI_TIMEOUT`。
+成功响应除 `content` 外，还可包含 model、provider、apiMode、durationMs、usage 和 contextLength。单次请求默认超时 180 秒；`service.timeoutMs` 可在 5 秒到 10 分钟的服务端边界内覆盖，设置页限制为 30 到 600 秒。外部 AbortSignal 对应 `AI_CANCELLED`，超时对应 `AI_TIMEOUT`。
+
+Base URL 如果误填为完整 `/chat/completions`、`/responses` 或 `/models` endpoint，会先规范化为服务根路径。推理模型不会发送通常不被接受的 `temperature` 参数。401/403、404、429、5xx、连接失败和超时均返回独立错误码和可操作提示。
 
 本地服务只把 API Key 转发给目标服务商，不持久化 Key，也不写入 operation log。
 
@@ -392,8 +396,8 @@ Job 队列当前为进程内状态，服务重启后不能继续轮询旧 Job。
 | `METACORE_LOCAL_PORT` | `3766` | localhost API 端口 |
 | `METACORE_LOCAL_CONFIG` | `server/.metacore-local.json` | 工作区配置文件 |
 | `METACORE_SESSION_ROOT` | OS 用户数据目录 | Session、trajectory 和操作日志目录 |
-| `METACORE_AGENT_RUNTIME` | `internal` | 健康状态中的 Runtime 标识；当前只实现 internal |
+| `METACORE_AGENT_RUNTIME` | `deepseek-harness` | 健康状态中的默认 Runtime 标识；可切换为 `internal` |
 
 ## 安全注意事项
 
-详细边界见 [SECURITY_MODEL.md](./SECURITY_MODEL.md)。当前版本没有 capability token，不应把端口暴露到局域网或公网。构建可能执行受信任工程自带的构建脚本；不要对未知工程运行构建。
+详细边界见 [SECURITY_MODEL.md](./SECURITY_MODEL.md)。Harness bridge 使用独立的启动 token；普通 localhost API 仍依赖 loopback 与 Origin 校验，不应把端口暴露到局域网或公网。构建可能执行受信任工程自带的构建脚本；不要对未知工程运行构建。

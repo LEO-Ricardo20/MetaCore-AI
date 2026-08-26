@@ -4,11 +4,12 @@ import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { CONFIG_PATH, FRONTEND_URL, HOST, LIMITS, PACKAGE_META, PORT } from './config.mjs'
 import { corsHeaders, ensureLocalOrigin, json, readBody } from './lib/http.mjs'
 import { normalizeForCompare, resolveExistingInsideWorkspace, toWorkspaceRelative } from './security/workspace-paths.mjs'
 import { createOpenAICompatibleAdapter } from './services/ai-provider.mjs'
-import { AgentError, AgentEventBus, JobManager, ServiceRegistry, SessionStore, ToolRegistry, createDefaultPluginRegistry, errorPayload, redactSensitive } from './agent/index.mjs'
+import { AgentError, AgentEventBus, AgentRuntimeManager, ApprovalStore, DeepSeekHarnessRuntime, InternalAgentRuntime, JobManager, ServiceRegistry, SessionStore, ToolRegistry, createDefaultPluginRegistry, errorPayload, redactSensitive } from './agent/index.mjs'
 
 const {
   readBytes: MAX_READ_BYTES,
@@ -26,7 +27,13 @@ const sessionStore = new SessionStore(undefined, eventBus)
 const pluginRegistry = createDefaultPluginRegistry()
 const serviceRegistry = new ServiceRegistry()
 const toolRegistry = new ToolRegistry(eventBus)
+const approvalStore = new ApprovalStore({ eventBus, sessions: sessionStore })
 const operationLogPath = path.join(sessionStore.root, 'operations.jsonl')
+const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const harnessRoot = path.resolve(process.env.METACORE_HARNESS_ROOT || path.join(appRoot, '..', 'deepseek-harness'))
+const harnessConfigPath = path.resolve(process.env.METACORE_HARNESS_CONFIG || path.join(appRoot, 'harness', 'cordis.yml'))
+const harnessPluginPath = path.resolve(process.env.METACORE_HARNESS_PLUGIN || path.join(appRoot, 'harness', 'metacore-tools.mjs'))
+const harnessBridgeToken = process.env.METACORE_HARNESS_BRIDGE_TOKEN || crypto.randomBytes(32).toString('hex')
 
 const SKIP_DIRS = new Set([
   '.git',
@@ -193,6 +200,21 @@ const aiProvider = createOpenAICompatibleAdapter({ recordOperation })
 serviceRegistry.define({ id: 'ai', version: '1.0.0', request: 'messages', result: 'content+usage' })
 serviceRegistry.provide('ai', 'default', aiProvider)
 const jobManager = new JobManager({ eventBus, sessions: sessionStore, concurrency: 2 })
+const runtimeManager = new AgentRuntimeManager({
+  selected: process.env.METACORE_AGENT_RUNTIME || 'deepseek-harness',
+  runtimes: [
+    new InternalAgentRuntime({ aiProvider }),
+    new DeepSeekHarnessRuntime({
+      harnessRoot,
+      configPath: harnessConfigPath,
+      pluginPath: harnessPluginPath,
+      sessionRoot: sessionStore.root,
+      bridgeUrl: `http://${HOST}:${PORT}/api`,
+      bridgeToken: harnessBridgeToken,
+      workspace: () => workspaceRoot,
+    }),
+  ],
+})
 
 async function commandAvailable(command) {
   const lookup = process.platform === 'win32' ? 'where.exe' : 'which'
@@ -1122,14 +1144,22 @@ function requireAIMessages(args = {}, taskType = 'agent-tool') {
   return args
 }
 
+function normalizePinIdentifier(value) {
+  const raw = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
+  if (/^(GPIO|IO)\d+$/.test(raw)) return `GPIO${raw.replace(/^(GPIO|IO)/, '')}`
+  if (/^[A-Z]{1,3}\d+$/.test(raw)) return raw
+  const number = Number(raw)
+  return Number.isInteger(number) && number >= 0 && number <= 255 ? String(number) : ''
+}
+
 function validatePinAssignments(pins = []) {
   if (!Array.isArray(pins)) throw new AgentError('TOOL_INPUT_INVALID', 'pins 必须是数组', { status: 400 })
   const seen = new Map()
   const conflicts = []
   for (const item of pins) {
-    const pin = Number(item?.pin)
+    const pin = normalizePinIdentifier(item?.pin)
     const name = String(item?.name ?? item?.signal ?? '').trim()
-    if (!Number.isInteger(pin) || pin < 0 || pin > 255 || !name) continue
+    if (!pin || !name) continue
     const previous = seen.get(pin)
     if (previous) conflicts.push({ pin, signals: [previous, name] })
     else seen.set(pin, name)
@@ -1185,6 +1215,12 @@ function registerAgentTools() {
 }
 
 function registerAgentJobs() {
+  jobManager.register('agent-task', async (payload, context) => {
+    await context.progress(5, '启动 Agent Runtime')
+    const result = await runtimeManager.runTask(payload, context)
+    await context.progress(100, 'Agent 任务完成')
+    return result
+  })
   jobManager.register('scheme-validation', async (payload, context) => {
     await context.progress(20, '校验引脚唯一性和 GPIO 范围')
     const result = validatePinAssignments(payload?.pins)
@@ -1224,6 +1260,58 @@ function registerAgentJobs() {
       return result
     })
   }
+}
+
+function hasHarnessBridgeAuth(req) {
+  const header = String(req.headers.authorization || '')
+  const received = header.startsWith('Bearer ') ? header.slice(7) : ''
+  const expected = Buffer.from(harnessBridgeToken)
+  const actual = Buffer.from(received)
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
+}
+
+async function executeHarnessBridgeTool(toolName, body) {
+  const metadata = {
+    projectId: String(body.projectId || ''),
+    sessionId: String(body.sessionId || ''),
+    jobId: String(body.jobId || ''),
+    runtime: 'deepseek-harness',
+  }
+  const args = body.args ?? {}
+  if (toolName === 'propose_file_change') {
+    const file = await readFile(args.path)
+    const approval = await approvalStore.create({
+      ...metadata,
+      toolName: 'write_file',
+      kind: 'file-diff',
+      title: `Agent 建议修改 ${file.path}`,
+      reason: args.reason,
+      risk: 'high',
+      args: { path: file.path, content: args.content, expectedModifiedAt: file.modifiedAt },
+      preview: { path: file.path, oldText: file.content, newText: args.content, expectedModifiedAt: file.modifiedAt },
+    })
+    return { status: 'approval_required', approval }
+  }
+  if (toolName === 'request_build') {
+    const profile = BUILD_PROFILES[args.profileId]
+    if (!profile) throw new AgentError('BUILD_PROFILE_INVALID', '构建配置不在白名单中', { status: 400 })
+    const approval = await approvalStore.create({
+      ...metadata,
+      toolName: 'run_build',
+      kind: 'build',
+      title: `Agent 请求执行 ${profile.label}`,
+      reason: args.reason,
+      risk: 'high',
+      args: { profileId: profile.id },
+      preview: { profileId: profile.id, command: [profile.command, ...profile.args].join(' ') },
+    })
+    return { status: 'approval_required', approval }
+  }
+  if (toolName === 'inspect_project' || toolName === 'run_local_analysis') return analyzeWorkspace()
+  if (toolName === 'read_file') return readFile(args.path)
+  if (toolName === 'search_files') return searchFiles(args.query, args.maxResults)
+  if (toolName === 'validate_pin_assignment') return validatePinAssignments(args.pins)
+  throw new AgentError('HARNESS_TOOL_NOT_FOUND', `MetaCore Harness 工具不存在：${toolName}`, { status: 404 })
 }
 
 function sseHeaders() {
@@ -1323,6 +1411,66 @@ async function route(req, res) {
     json(res, 200, { plugins: pluginRegistry.list(), services: serviceRegistry.list(), tools: toolRegistry.list() }, origin)
     return
   }
+  if (req.method === 'GET' && url.pathname === '/api/agent/runtime') {
+    json(res, 200, runtimeManager.status(), origin)
+    return
+  }
+  if (req.method === 'GET' && url.pathname === '/api/agent/approvals') {
+    json(res, 200, { approvals: approvalStore.list({ projectId: url.searchParams.get('projectId') ?? undefined, status: url.searchParams.get('status') ?? undefined }) }, origin)
+    return
+  }
+  if (req.method === 'GET' && /^\/api\/agent\/approvals\/[^/]+$/.test(url.pathname)) {
+    const approval = approvalStore.get(url.pathname.split('/').pop())
+    if (!approval) { json(res, 404, { error: '审批项不存在', code: 'APPROVAL_NOT_FOUND', requestId }, origin); return }
+    json(res, 200, approval, origin)
+    return
+  }
+  if (req.method === 'POST' && /^\/api\/agent\/approvals\/[^/]+\/(approve|reject)$/.test(url.pathname)) {
+    const approvalId = url.pathname.split('/')[4]
+    const decision = url.pathname.split('/')[5] === 'approve' ? 'approved' : 'rejected'
+    const approval = await approvalStore.decide(approvalId, decision, async (item) => {
+      if (item.toolName === 'write_file') {
+        return toolRegistry.execute('write_file', item.args, {
+          requestId,
+          sessionId: item.sessionId,
+          jobId: item.jobId,
+          approved: true,
+          allowWrite: true,
+          allowBuild: false,
+          allowExport: false,
+        })
+      }
+      if (item.toolName === 'run_build') {
+        return toolRegistry.execute('run_build', item.args, {
+          requestId,
+          sessionId: item.sessionId,
+          jobId: item.jobId,
+          approved: true,
+          allowWrite: false,
+          allowBuild: true,
+          allowExport: false,
+        })
+      }
+      throw new AgentError('APPROVAL_TOOL_UNSUPPORTED', `审批工具不支持：${item.toolName}`, { status: 400 })
+    })
+    json(res, 200, approval, origin)
+    return
+  }
+  if (req.method === 'POST' && /^\/api\/agent\/bridge\/tools\/[^/]+$/.test(url.pathname)) {
+    if (!hasHarnessBridgeAuth(req)) { json(res, 401, { error: 'Harness bridge authorization failed', code: 'HARNESS_BRIDGE_UNAUTHORIZED', requestId }, origin); return }
+    const toolName = decodeURIComponent(url.pathname.split('/').pop())
+    const body = await readBody(req)
+    json(res, 200, { result: await executeHarnessBridgeTool(toolName, body) }, origin)
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/api/agent/tasks') {
+    const body = await readBody(req)
+    const session = body.sessionId ? await sessionStore.get(body.sessionId) : await sessionStore.create(body.projectId, { source: 'agent-task', runtime: body.runtime || runtimeManager.selected })
+    if (!session) { json(res, 404, { error: '会话不存在', code: 'SESSION_NOT_FOUND', requestId }, origin); return }
+    const job = await jobManager.create({ projectId: body.projectId ?? session.projectId, stage: 'agent-task', sessionId: session.id, payload: { ...body, runtime: body.runtime || runtimeManager.selected } })
+    json(res, 202, { ...job, runtime: body.runtime || runtimeManager.selected }, origin)
+    return
+  }
   if (req.method === 'POST' && /^\/api\/agent\/tools\/[^/]+$/.test(url.pathname)) {
     const toolName = decodeURIComponent(url.pathname.split('/').pop())
     const body = await readBody(req)
@@ -1347,7 +1495,7 @@ async function route(req, res) {
     return
   }
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    json(res, 200, { ok: true, service: 'metacore-studio-local', version: PACKAGE_META.version, workspaceRoot, port: PORT, agentRuntime: process.env.METACORE_AGENT_RUNTIME ?? 'internal' }, origin)
+    json(res, 200, { ok: true, service: 'metacore-studio-local', version: PACKAGE_META.version, workspaceRoot, port: PORT, agentRuntime: runtimeManager.selected, harness: runtimeManager.status().runtimes.find((runtime) => runtime.id === 'deepseek-harness') }, origin)
     return
   }
 
@@ -1363,7 +1511,15 @@ async function route(req, res) {
 
   if (req.method === 'POST' && url.pathname === '/api/ai/call') {
     const body = await readBody(req)
-    json(res, 200, await aiProvider.call(body.service, body.messages, body.temperature), origin)
+    const controller = new AbortController()
+    const abortRequest = () => controller.abort()
+    req.once('aborted', abortRequest)
+    res.once('close', () => { if (!res.writableEnded) controller.abort() })
+    try {
+      json(res, 200, await aiProvider.call(body.service, body.messages, body.temperature, { signal: controller.signal, taskType: body.taskType }), origin)
+    } finally {
+      req.removeListener('aborted', abortRequest)
+    }
     return
   }
 
@@ -1472,3 +1628,7 @@ server.listen(PORT, HOST, () => {
     console.log(`Workspace: ${workspaceRoot}`)
   }
 })
+
+const shutdown = () => { void runtimeManager.close() }
+process.once('SIGINT', shutdown)
+process.once('SIGTERM', shutdown)

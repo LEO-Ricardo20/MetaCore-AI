@@ -1,3 +1,16 @@
+const MIN_AI_TIMEOUT_MS = 5_000
+const DEFAULT_AI_TIMEOUT_MS = Math.max(
+  MIN_AI_TIMEOUT_MS,
+  Math.min(10 * 60 * 1000, Number(process.env.METACORE_AI_TIMEOUT_MS || 180_000)),
+)
+const MAX_AI_TIMEOUT_MS = 10 * 60 * 1000
+
+function resolveAITimeoutMs(service) {
+  const requested = Number(service?.timeoutMs)
+  if (!Number.isFinite(requested) || requested <= 0) return DEFAULT_AI_TIMEOUT_MS
+  return Math.max(MIN_AI_TIMEOUT_MS, Math.min(MAX_AI_TIMEOUT_MS, requested))
+}
+
 function normalizeAIBaseURL(value) {
   let url
   try {
@@ -13,6 +26,9 @@ function normalizeAIBaseURL(value) {
     throw error
   }
   if (url.hostname === 'localhost') url.hostname = '127.0.0.1'
+  // Users commonly paste the full endpoint from provider documentation. The
+  // adapter owns the endpoint suffix, so remove it before appending one.
+  url.pathname = url.pathname.replace(/\/(?:chat\/completions|responses|models)\/?$/i, '') || '/'
   return url.toString().replace(/\/+$/, '')
 }
 
@@ -23,6 +39,29 @@ function extractProviderError(raw, status) {
   } catch {
     return raw.trim().slice(0, 500) || `HTTP ${status}`
   }
+}
+
+function explainProviderError(message, status, service) {
+  const detail = String(message || `HTTP ${status}`).trim()
+  if (status === 401 || status === 403) {
+    return `AI API Key 无效或无权限（${service.provider}/${service.model}）。请重新填写服务商 API Key，并确认账户有余额或调用权限。原始提示：${detail}`
+  }
+  if (status === 404) {
+    return `AI 接口或模型不存在（${service.provider}/${service.model}）。请检查 Base URL 是否只填写到 /v1（不要粘贴完整 /chat/completions），并点击“读取模型”选择平台实际返回的模型。原始提示：${detail}`
+  }
+  if (status === 400) {
+    return `AI 请求参数被服务商拒绝（${service.provider}/${service.model}）。请确认 API 协议、模型名称和请求能力匹配。推理模型通常不支持 temperature 等采样参数。原始提示：${detail}`
+  }
+  return detail
+}
+
+function providerErrorCode(status) {
+  if (status === 401 || status === 403) return 'AI_AUTH_FAILED'
+  if (status === 404) return 'AI_ENDPOINT_OR_MODEL_NOT_FOUND'
+  if (status === 408 || status === 504) return 'AI_TIMEOUT'
+  if (status === 429) return 'AI_RATE_LIMITED'
+  if (status >= 500) return 'AI_PROVIDER_UNAVAILABLE'
+  return `AI_HTTP_${status}`
 }
 
 function extractOpenAIResponseText(data) {
@@ -39,7 +78,43 @@ function extractOpenAIResponseText(data) {
 function extractChatResponseText(message) {
   if (typeof message?.content === 'string') return message.content
   if (Array.isArray(message?.content)) return message.content.map((part) => typeof part === 'string' ? part : part?.text ?? part?.content ?? '').filter(Boolean).join('')
+  if (typeof message?.text === 'string') return message.text
   return ''
+}
+
+function responseShape(data, apiMode) {
+  if (apiMode === 'responses') {
+    return {
+      keys: Object.keys(data ?? {}).slice(0, 20),
+      outputCount: Array.isArray(data?.output) ? data.output.length : 0,
+      outputTextChars: typeof data?.output_text === 'string' ? data.output_text.length : 0,
+      outputTypes: Array.isArray(data?.output) ? data.output.slice(0, 6).map((item) => item?.type ?? typeof item) : [],
+    }
+  }
+  const choice = Array.isArray(data?.choices) ? data.choices[0] : undefined
+  const message = choice?.message
+  return {
+    keys: Object.keys(data ?? {}).slice(0, 20),
+    choiceCount: Array.isArray(data?.choices) ? data.choices.length : 0,
+    finishReason: choice?.finish_reason ?? null,
+    messageKeys: message && typeof message === 'object' ? Object.keys(message).slice(0, 20) : [],
+    contentType: Array.isArray(message?.content) ? 'array' : typeof message?.content,
+    contentChars: typeof message?.content === 'string' ? message.content.length : Array.isArray(message?.content) ? message.content.length : 0,
+    reasoningChars: typeof message?.reasoning_content === 'string' ? message.reasoning_content.length : 0,
+    textChars: typeof message?.text === 'string' ? message.text.length : 0,
+  }
+}
+
+function resolveTaskModel(service, taskType) {
+  const structuredTask = ['hardware-scheme', 'hardware-candidates', 'model-selection', 'firmware-generation', 'code-consistency', 'flow-graph'].includes(String(taskType))
+  // DeepSeek V4 Flash can spend the entire output budget on reasoning for a
+  // large JSON contract and finish with an empty `content`. The stable chat
+  // model uses the same credential and endpoint but reliably completes these
+  // bounded structured tasks.
+  if (structuredTask && service.provider === 'deepseek' && /deepseek-v4-flash/i.test(String(service.model))) {
+    return 'deepseek-chat'
+  }
+  return service.model
 }
 
 function resolveAIAPIMode(service) {
@@ -100,6 +175,65 @@ function mockContract(taskType, messages = []) {
       { from: 'GND', to: 'DHT20 GND + SSD1306 GND', wireColor: '黑', note: '公共地' },
     ],
   } }
+  if (taskType === 'hardware-candidates') {
+    const prompt = messages.map((message) => String(message?.content ?? '')).join('\n')
+    const questions = [...prompt.matchAll(/^问题\s+(\d+)：(.+)$/gm)].map((match) => ({ questionIndex: Number(match[1]), question: match[2].trim() }))
+    const sourceQuestions = questions.length ? questions : [{ questionIndex: 0, question: '请确认具体型号' }]
+    const labels = {
+      common: ['成熟通用方案', '量产资料完整，常见应用验证充分'],
+      optimal: ['需求匹配方案', '接口和功能与当前项目匹配'],
+      value: ['稳健性价比方案', '在保留安全余量的前提下优化成本'],
+      best: ['高余量方案', '优先品质、性能余量和扩展能力'],
+    }
+    return { ...base, data: {
+      sets: sourceQuestions.map(({ questionIndex, question }) => ({
+        questionIndex,
+        question,
+        candidates: Object.entries(labels).map(([category, [model, rationale]]) => ({
+          id: `q${questionIndex}-${category}`,
+          category,
+          model,
+          answer: `${model}；具体电压、电流和封装在原理图冻结前按数据手册复核`,
+          rationale,
+          confidence: 'medium',
+          estimatedCost: '待供应商报价',
+          safetyNotes: ['保留电气和热设计余量', '采购前复核官方数据手册'],
+          risks: ['Mock 候选仅用于界面和流程验收，不代表真实器件选型'],
+        })),
+        recommendedId: `q${questionIndex}-common`,
+        recommendationReason: '在确定性测试中优先成熟通用方案，真实项目必须重新核对数据手册。',
+      })),
+      safetySummary: '候选已按保守原则排序；供电、保护、温升、封装和采购状态仍需在冻结方案前人工复核。',
+    } }
+  }
+  if (taskType === 'model-selection') {
+    const candidates = [
+      ['common', '成熟通用方案', 88],
+      ['optimal', '需求匹配方案', 86],
+      ['value', '稳健性价比方案', 82],
+      ['best', '高余量方案', 84],
+    ].map(([category, model, score], index) => ({
+      id: `mock-model-${index}`,
+      category,
+      model,
+      maker: 'MetaCore deterministic fixture',
+      interface: '待按数据手册复核',
+      evidence: ['Mock 固定性证据，不代表真实器件参数'],
+      strengths: ['用于验证四类候选界面和权重流程'],
+      tradeoffs: ['真实方案必须重新核对型号、电气和供应'],
+      riskNotes: ['Mock 结果不得用于直接采购或上板'],
+      estimatedCost: '待供应商报价',
+      availability: '待复核',
+      score,
+      recommended: category === 'common',
+    }))
+    return { ...base, data: {
+      candidates,
+      selectedCandidateId: 'mock-model-0',
+      selectionReason: '固定性测试优先成熟通用候选，真实项目必须根据数据手册和电气约束复核。',
+      safetyGate: ['电压/电流/温升需根据真实型号复核', '需保留保护、限流和散热余量'],
+    } }
+  }
   if (taskType === 'firmware-generation') {
     const main = esp32.arduino
       ? { path: 'src/main.cpp', language: 'cpp', content: `#include <Arduino.h>\n#include <Wire.h>\n#include "drivers/dht20.h"\n#include "drivers/ssd1306.h"\n#include "connectivity.h"\n#define SDA_GPIO ${esp32.sda}\n#define SCL_GPIO ${esp32.scl}\nvoid setup() { Serial.begin(115200); Wire.begin(SDA_GPIO, SCL_GPIO); dht20_init(); ssd1306_init(); wifi_connect(); mqtt_connect(); }\nvoid loop() { if (dht20_read_retry()) { mqtt_publish(); ssd1306_show(); } else { Serial.println("sensor error"); } delay(5000); }\n` }
@@ -168,16 +302,18 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
       if (service.provider === 'mock') return callMock(service, messages, options)
 
       const baseURL = normalizeAIBaseURL(service.baseURL)
-      const headers = { 'Content-Type': 'application/json' }
+      const headers = { 'Content-Type': 'application/json', Accept: 'application/json' }
       if (service.apiKey) headers.Authorization = `Bearer ${service.apiKey}`
 
       const controller = new AbortController()
       let timedOut = false
       const abortFromCaller = () => controller.abort()
       options.signal?.addEventListener('abort', abortFromCaller, { once: true })
-      const timeout = setTimeout(() => { timedOut = true; controller.abort() }, Math.max(5_000, Math.min(180_000, Number(service.timeoutMs ?? 90_000))))
+      const timeoutMs = resolveAITimeoutMs(service)
+      const timeout = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
       const startedAt = Date.now()
       const apiMode = resolveAIAPIMode(service)
+      const requestModel = resolveTaskModel(service, options.taskType)
       let endpoint
       let body
 
@@ -186,7 +322,7 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
         const inputMessages = messages.filter((message) => message.role !== 'system')
         endpoint = `${baseURL}/responses`
         body = {
-          model: service.model,
+          model: requestModel,
           input: inputMessages.length === 1 && inputMessages[0].role === 'user'
             ? inputMessages[0].content
             : inputMessages,
@@ -195,7 +331,16 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
         if (systemMessage) body.instructions = systemMessage.content
       } else {
         endpoint = `${baseURL}/chat/completions`
-        body = { model: service.model, messages, stream: false, temperature, ...(service.maxOutputTokens ? { max_tokens: service.maxOutputTokens } : {}) }
+        const isReasoningModel = /(?:reasoner|reasoning|deepseek-r1)/i.test(service.model)
+        body = {
+          model: requestModel,
+          messages,
+          stream: false,
+          // DeepSeek reasoning routes reject sampling controls. Do not send
+          // temperature for those models; normal chat models still receive it.
+          ...(!isReasoningModel ? { temperature } : {}),
+          ...(service.maxOutputTokens ? { max_tokens: service.maxOutputTokens } : {}),
+        }
       }
 
       try {
@@ -207,8 +352,10 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
         })
         const raw = await response.text()
         if (!response.ok) {
-          const error = new Error(extractProviderError(raw, response.status))
+          const error = new Error(explainProviderError(extractProviderError(raw, response.status), response.status, service))
           error.status = response.status
+          error.code = providerErrorCode(response.status)
+          error.retryable = response.status === 429 || response.status >= 500
           throw error
         }
 
@@ -217,13 +364,22 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
           ? extractOpenAIResponseText(data)
           : extractChatResponseText(data.choices?.[0]?.message)
         if (typeof content !== 'string' || !content) {
-          const error = new Error('AI 服务返回成功，但没有可读取的文本内容')
+          const shape = responseShape(data, apiMode)
+          recordOperation('ai.empty_response', {
+            provider: service.provider,
+            model: service.model,
+            apiMode,
+            host: new URL(baseURL).host,
+            shape,
+          }, 'failed')
+          const error = new Error(`AI 服务返回成功，但没有可读取的文本内容（响应结构：${JSON.stringify(shape)}）`)
           error.status = 502
           throw error
         }
         recordOperation('ai.call', {
           provider: service.provider,
-          model: service.model,
+          model: requestModel,
+          configuredModel: service.model !== requestModel ? service.model : undefined,
           apiMode,
           host: new URL(baseURL).host,
         })
@@ -231,7 +387,7 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
         const outputTokens = Number(data.usage?.output_tokens ?? data.usage?.completion_tokens ?? 0)
         return {
           content,
-          model: service.model,
+          model: requestModel,
           provider: service.provider,
           apiMode,
           durationMs: Date.now() - startedAt,
@@ -240,7 +396,10 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
         }
       } catch (cause) {
         if (cause.name === 'AbortError') {
-          const error = new Error(timedOut ? 'AI 服务请求超时（90 秒）' : 'AI 请求已取消')
+          const host = (() => { try { return new URL(baseURL).host } catch { return '未知服务' } })()
+          const error = new Error(timedOut
+            ? `AI 服务请求超时（${Math.round(timeoutMs / 1_000)} 秒）：${service.provider}/${service.model} @ ${host}。请先测试连接；若连接成功但生成仍慢，可降低任务规模、关闭高推理强度或把超时调大。`
+            : 'AI 请求已取消')
           error.status = timedOut ? 504 : 409
           error.code = timedOut ? 'AI_TIMEOUT' : 'AI_CANCELLED'
           error.retryable = timedOut
@@ -249,6 +408,8 @@ export function createOpenAICompatibleAdapter({ recordOperation = () => {} } = {
         if (cause instanceof TypeError && cause.message === 'fetch failed') {
           const error = new Error(`无法连接 AI 服务（${new URL(baseURL).host}）。请检查 Base URL、网络代理，或确认本地模型服务已经启动。`)
           error.status = 502
+          error.code = 'AI_CONNECTION_FAILED'
+          error.retryable = true
           throw error
         }
         throw cause

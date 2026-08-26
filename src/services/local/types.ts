@@ -5,7 +5,10 @@ export interface LocalHealth {
   workspaceRoot: string
   port: number
   agentRuntime?: 'internal' | 'deepseek-harness' | string
+  harness?: import('@/types/agent').AgentRuntimeInfo
 }
+
+export type { AgentApproval, AgentRuntimeStatus } from '@/types/agent'
 
 export interface WorkspaceInfo {
   workspaceRoot: string

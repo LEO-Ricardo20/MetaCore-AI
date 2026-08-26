@@ -1,6 +1,6 @@
 # MetaCore Studio 产品工作流
 
-本文描述 MetaCore Studio 2.2 的项目生命周期、页面信息架构、状态机、产物依赖和恢复行为。实现以 `src/types/project.ts`、`src/services/projects/projectLifecycle.ts` 与 `src/store/projectStore.ts` 为准。
+本文描述 MetaCore Studio 当前版本的项目生命周期、页面信息架构、状态机、产物依赖和恢复行为。实现以 `src/types/project.ts`、`src/services/projects/projectLifecycle.ts` 与 `src/store/projectStore.ts` 为准。
 
 ## 产品定位
 

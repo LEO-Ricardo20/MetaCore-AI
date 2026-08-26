@@ -10,7 +10,7 @@ flowchart LR
     UI --> Store[Zustand Project Schema v3]
     UI --> AIFlow[AI Task Contract + Context Builder]
     UI --> Local[Node.js localhost service]
-    Local --> Agent[Internal Agent Runtime]
+    Local --> Agent[Agent Runtime Manager]
     Agent --> Registry[Plugin / Service / Tool Registry]
     Agent --> Jobs[Job + Event Bus + SSE]
     Agent --> Sessions[Session + JSONL trajectory]
@@ -93,7 +93,7 @@ Zustand `metacore-projects` 的持久化版本升级为 3。迁移会补齐生�
 
 AI 集成拆为四层：
 
-1. Provider Client：向 localhost 代理或兼容服务发送请求，处理取消、超时和传输错误。
+1. Provider Client：默认只向 localhost MetaCore 网关发送请求，由网关调用兼容服务并统一处理取消、超时、协议和传输错误。
 2. Task Contract：要求版本化 envelope，校验 `schemaVersion`、`taskType` 和 `status`。
 3. Domain Parser：验证硬件方案、代码文件、流程节点和一致性结果。
 4. Project Store：只有通过解析和验证的数据才能更新项目状态。
@@ -124,13 +124,13 @@ server/
 ├── security/workspace-paths.mjs
 │                              # 工作区 realpath 与 symlink/junction 防逃逸
 ├── services/ai-provider.mjs  # OpenAI-compatible Provider Adapter
-├── agent/                    # Internal Agent Runtime
+├── agent/                    # Runtime manager, Harness adapter, jobs, sessions, approvals and tools
 └── smoke-test.mjs            # 本地 API、安全和 Job/SSE 冒烟测试
 ```
 
 现有文件、分析、备份、恢复、构建、报告和 AI API 路径保持兼容。所有响应设置 Request ID，错误通过稳定 code、message、retryable、requestId 和可选 details 规范化。
 
-## Internal Agent Runtime
+## Agent Runtime
 
 `server/agent` 实现：
 
@@ -144,7 +144,7 @@ server/
 - 独立 Session Root、JSON 元数据和 JSONL trajectory。
 - 日志与 Session 脱敏。
 
-该运行时借鉴 DeepSeek Harness 的结构，但没有加载或调用 DeepSeek Harness。详细说明见 [AGENT_ARCHITECTURE.md](./AGENT_ARCHITECTURE.md)。
+`server/agent` 同时提供 `InternalAgentRuntime` 和可选的 `DeepSeekHarnessRuntime`。后者通过旁边源码 checkout 的官方 JSON-RPC packaged bin 接入 Cordis；两者都由 `AgentRuntimeManager` 统一映射为 MetaCore Job、Session 和 SSE 事件。详细说明见 [AGENT_ARCHITECTURE.md](./AGENT_ARCHITECTURE.md)。
 
 ## 工作区与文件系统
 
@@ -181,7 +181,7 @@ Session Root 默认位于操作系统用户数据目录，而不是用户工程�
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-  "appVersion": "2.3.0",
+   "appVersion": "2.5.0-harness.2",
   "exportedAt": "ISO-8601",
   "project": {}
 }

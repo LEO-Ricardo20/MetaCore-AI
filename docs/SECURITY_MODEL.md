@@ -2,7 +2,7 @@
 
 本文说明 React 应用、localhost 服务、Agent Runtime、工作区、AI Provider、日志和项目归档之间的安全边界。
 
-MetaCore Studio 是本机研发工具，不是公共远程文件服务器。安全设计目标是：只有用户在本机打开的页面可以访问服务；所有文件操作都限制在用户明确授权的工作区内；高风险写入和构建不能绕过审批、备份、冲突检查与白名单；API Key 和疑似凭据不进入仓库、日志或项目归档。
+MetaCore Studio 是本机研发工具，不是公共远程文件服务器。安全设计目标是：只有用户在本机打开的页面可以访问服务；所有文件操作都限制在用户明确授权的工作区内；DeepSeek Harness 不能绕过 MetaCore 的审批、备份、冲突检查与构建白名单；API Key 和疑似凭据不进入仓库、日志或项目归档。
 
 ## 信任边界
 
@@ -34,7 +34,9 @@ Session Root 与浏览器项目存储均在工作区之外
 
 ## Capability Token 状态
 
-当前版本 **尚未实现每次启动生成的 capability token 或 session token 握手**。现有保护层是：
+Harness bridge 已实现每次服务启动生成的随机 bearer token。它只用于防止错误进程调用 `POST /api/agent/bridge/tools/*`，不替代工作区、路径、审批和构建白名单。普通本地 API 仍依赖 loopback 与 Origin 校验。
+
+现有保护层是：
 
 1. loopback-only 监听。
 2. 本机 Origin 校验。
@@ -44,16 +46,9 @@ Session Root 与浏览器项目存储均在工作区之外
 6. 写入冲突检测与备份。
 7. 构建配置白名单。
 8. Agent Tool 权限和审批策略。
+9. Harness bridge 的 timing-safe capability token。
 
-未来如增加 capability token，应满足：
-
-- 每次服务启动生成高熵随机值，不写入项目目录或日志。
-- 前端通过受控启动配置或一次性本机握手获取。
-- 普通 JSON API 使用请求头；SSE 需要使用不会泄露到第三方 Referer 的安全连接方案。
-- 保留开发模式易用性和现有 API 的迁移窗口。
-- Token 只能证明调用者获得了本机启动能力，不能替代工作区、路径、审批和构建白名单。
-
-在 capability token 落地前，不应把 localhost 服务暴露到局域网、端口转发、远程浏览器或多用户共享主机环境。
+Token 只存在于服务进程环境和 Harness 子进程环境，不写入项目目录、Session 轨迹或操作日志。普通 JSON API 仍不应暴露到局域网、端口转发、远程浏览器或多用户共享主机环境。
 
 ## 工作区授权
 
@@ -98,7 +93,7 @@ Windows 比较不区分大小写。符号链接或目录联接如果指向工作
 8. 返回新文件元数据和备份 ID。
 9. 记录脱敏后的操作摘要。
 
-Agent `write_file` 工具还要求 `allowWrite` 和用户批准。当前前端尚未完成统一的 AI diff 审批面板，因此 AI 不应静默调用写工具；现有手动文件编辑确认流程继续作为实际交互边界。
+Agent `write_file` 工具还要求 `allowWrite` 和用户批准。Harness 的文件 Diff 和构建审批由任务抽屉展示；用户批准后，MetaCore 才会进入备份、冲突检查和白名单执行流程。
 
 ## 备份和恢复
 
@@ -134,7 +129,7 @@ Tool Policy 将能力拆为：
 
 工具执行前检查取消信号、参数、权限、审批和工作区。写文件、恢复备份和构建被标记为需要审批。权限不足或未批准时返回稳定错误码，Tool Event 不应被当作已经完成的操作。
 
-当前 Policy 是进程内能力控制，不是操作系统沙箱。Internal Runtime 不会启动容器或低权限子账户；真正的远程、多租户或不受信任代码执行场景需要额外的 OS sandbox。
+当前 Policy 是进程内能力控制，不是操作系统沙箱。Internal Runtime 不会启动容器或低权限子账户；Harness 也只通过 bridge 提交受控工具请求，不提供任意 shell。真正的远程、多租户或不受信任代码执行场景需要额外的 OS sandbox。
 
 ## AI 上下文
 
@@ -154,6 +149,8 @@ AI 请求只在用户主动执行方案、代码、流程、一致性验证或�
 - AI 服务配置和 API Key 当前保存在浏览器 `localStorage`。
 - Key 不进入 Git 工作区、项目归档、Session 元数据或操作日志。
 - localhost AI Proxy 只把 Key 转发给用户配置的目标服务商。
+- DeepSeek Harness 任务可以临时接收设置页当前 DeepSeek 的 Key、Base URL 和模型；它们只进入该次子进程环境，不写入 Cordis YAML、Session 事件或操作日志。
+- 浏览器直连默认关闭；只有开发者显式设置 `VITE_METACORE_ALLOW_DIRECT_AI=true` 才启用。
 - 日志只记录服务商、模型、目标主机、耗时、usage 和错误摘要。
 - Ollama 可以不提供 Key；其他远程服务通常需要 Key。
 
@@ -199,10 +196,10 @@ Session 默认保存在操作系统用户数据目录，可通过 `METACORE_SESS
 
 ## 已知安全缺口与后续优先级
 
-1. 增加 localhost capability token 或等价的安全握手。
+1. 为普通 localhost API 增加 capability token 或等价的安全握手；Harness bridge 已有独立 token。
 2. 增加有限的请求速率保护。
 3. 对同一工作区的写操作和恢复操作串行化。
-4. 完成前端 AI diff 审批、批准记录和重新验证闭环。
+4. 将当前内存 ApprovalStore 持久化，并补充批准后的重新分析/重新构建门禁。
 5. 持久化 Job 元数据，并在重启时把 `running` 转换为 `interrupted`。
 6. 从 JSONL trajectory 重放 Session SSE。
 7. 为 Session Root 提供可配置保留期和显式清理 API。

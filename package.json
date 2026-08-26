@@ -1,6 +1,6 @@
 {
   "name": "metacore-studio",
-  "version": "2.4.0",
+  "version": "2.5.0-harness.2",
   "description": "AI-assisted hardware architecture, firmware generation, and local embedded project analysis for ESP32 and STM32",
   "private": true,
   "type": "module",
@@ -16,12 +16,14 @@
     "test:local": "node server/smoke-test.mjs",
     "test:e2e": "node scripts/browser-smoke.mjs",
     "test:e2e:real": "node scripts/real-project-smoke.mjs",
+    "test:e2e:real-ai": "node scripts/real-ai-smoke.mjs",
     "verify:delivery": "node scripts/verify-delivery.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run test:local && npm run build",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-sdk-client": "0.1.1-rc.2",
     "@monaco-editor/react": "^4.6.0",
     "@react-pdf/renderer": "^4.3.2",
     "clsx": "^2.1.0",

@@ -2,6 +2,7 @@ import {
   AlertCircle,
   AlertTriangle,
   BarChart3,
+  Bot,
   CheckCircle2,
   Code2,
   Cpu,
@@ -398,6 +399,7 @@ function BuildTab({ analysis, systemInfo, buildResult, loading, isDark, onRunBui
             <span className={buildResult.success ? 'text-emerald-400' : 'text-red-400'}>{buildResult.success ? '构建成功' : `构建失败 · ${buildResult.exitCode}`}</span>
             <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{(buildResult.durationMs / 1000).toFixed(1)}s</span>
           </div>
+          {!buildResult.success && <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('metacore:agent-task', { detail: { goal: `分析当前 ${buildResult.profileId} 构建失败并提出最小修复方案。先检查构建日志、工程配置和相关源文件；如需修改文件，请先提交 Diff 审批，不要直接写入。\n\n构建命令：${buildResult.command}\n退出码：${buildResult.exitCode}\n标准输出：${buildResult.stdout}\n标准错误：${buildResult.stderr}` } }))} className={cn('mb-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold', isDark ? 'bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25' : 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100')}><Bot size={12} />让 Agent 诊断并修复</button>}
           <pre className={cn('max-h-80 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-4 p-2 rounded-md font-mono', isDark ? 'bg-black/30 text-slate-400' : 'bg-slate-50 text-slate-600')}>
             {[buildResult.stdout, buildResult.stderr].filter(Boolean).join('\n') || '无构建输出'}
           </pre>

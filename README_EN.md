@@ -6,7 +6,7 @@
   <img src="./public/logo.svg" alt="MetaCore Studio logo" width="96" />
 </p>
 
-> AI-assisted hardware architecture and embedded project analysis for ESP32, STM32, and custom chips.
+> AI-assisted hardware design, firmware generation, and local embedded project analysis for ESP32, STM32, and custom chips.
 
 面向 ESP32、STM32 与自定义芯片的 AI 硬件方案生成、固件设计和本地嵌入式工程分析平台。
 
@@ -19,7 +19,7 @@ Documentation language: English with Chinese UI names where they match the appli
 [![Version](https://img.shields.io/github/package-json/v/LEO-Ricardo20/MetaCore-Studio?label=version&color=16a34a)](#release-status)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)](#license)
 
-MetaCore Studio turns a natural-language hardware requirement into a structured embedded design workflow:
+MetaCore Studio turns a natural-language hardware requirement into a structured embedded design workflow. When a part number is unknown, the clarification dialog can request conservative AI candidates, allocate a strict 100-point preference budget across common, optimal, value, and best options, auto-select a model, and continue only after confirmation:
 
 ```text
 Requirement -> Hardware scheme -> Pin/BOM/Wiring -> Firmware -> Flow graph -> Local diagnosis -> Export
@@ -38,6 +38,7 @@ The browser application handles the product interface and AI workflows. An optio
 - [Quick Start](#quick-start)
 - [Local Engineering Mode](#local-engineering-mode)
 - [AI Providers](#ai-providers)
+- [DeepSeek Harness Runtime](#deepseek-harness-runtime)
 - [Example Project](#example-project)
 - [Commands](#commands)
 - [Security Boundaries](#security-boundaries)
@@ -49,12 +50,15 @@ The browser application handles the product interface and AI workflows. An optio
 - [Contributing](#contributing)
 - [GitHub Collaboration Files](#github-collaboration-files)
 - [License](#license)
+- [Author's Note](#authors-note)
 
 ## Highlights
 
 | Area | What it provides |
 | --- | --- |
 | Hardware design | Chip selection, GPIO allocation, BOM, wiring table, and pin visualization |
+| AI candidate selection | Four conservative candidate categories, safety gates, weighted preferences, and confirmed model selection |
+| Preference budget | A strict 100-point allocation across common, optimal, value, and best options |
 | ESP32 specialization | Five board-aware family profiles with correct PlatformIO/IDF targets, storage, USB, radio, and GPIO policy |
 | Firmware generation | Modular C/C++ project generation for Arduino, PlatformIO, ESP-IDF, and STM32CubeIDE |
 | Driver library | Built-in templates for SSD1306, DHT, AHT20, WS2812, HC-SR04, buzzer, servo, and DRV8833 |
@@ -102,7 +106,7 @@ See [`docs/ESP32_SPECIALIZATION.md`](docs/ESP32_SPECIALIZATION.md) for the famil
 
 ## Release Status
 
-Current release: **v2.4.0** (`2026-08-23`)
+Current release: **v2.5.0-harness.2** (`2026-08-25`). This release adds conservative AI candidate selection, a four-way 100-point preference view, model confirmation evidence, one-click scheme generation from selected models, and the integrated DeepSeek Harness Runtime.
 
 Version 2.4.0 introduces board-aware ESP32 specialization for ESP32, S3, C3, C6, and S2. Projects now retain the exact PlatformIO board, ESP-IDF target, Flash, PSRAM, USB, radio, partition, upload, and monitor configuration; prompt skeletons no longer hard-code `esp32dev`, and board-level GPIO policy runs after scheme generation. The complete Mock workflow was verified with ESP32-C3, while the repository's classic ESP32 example was scanned and built with the real PlatformIO toolchain. Mock results are not presented as real DeepSeek calls, and a successful build does not imply a physical board was flashed.
 
@@ -114,7 +118,7 @@ Version 2.4.0 introduces board-aware ESP32 specialization for ESP32, S3, C3, C6,
 
 ## Sponsor
 
-VPS.Town is a platform focused on VPS and cloud server services, providing stable and flexible cloud resources for developers, personal website owners, and project teams. Its services are suitable for website deployment, application hosting, development and testing, and personal project operations. We thank VPS.Town for supporting the development and open-source work of MetaCore Studio.
+VPS.Town is a platform focused on VPS and cloud server services, providing stable and flexible cloud resources for developers, personal website owners, and project teams. Its services are suitable for website deployment, application hosting, development and testing, and personal project operations. We thank VPS.Town for supporting the development and public collaboration around MetaCore Studio.
 
 <a href="https://vps.town/" target="_blank" rel="noreferrer">
   <img src="./public/sponsor.png" alt="VPS.Town sponsor" width="900" />
@@ -189,11 +193,19 @@ Configure providers from the `设置` page. The current client supports:
 
 Custom endpoints can use either the Responses API or Chat Completions. CCH-compatible endpoints such as `autobits.cc` use the Responses API according to their provider documentation. Use the provider's `/models` response as the source of truth for model IDs.
 
-AI keys are stored in the browser's `localStorage` by the current implementation. Browser storage is outside the Git working tree and is not included by `git add`, commit, or push. When the localhost service is running, AI requests use the local proxy; the service forwards the key only to the configured provider and does not persist it or write it to operation logs. If the proxy is unavailable, the client may fall back to a browser-direct request when the provider permits CORS.
+AI keys are stored in the browser's `localStorage` by the current implementation. Browser storage is outside the Git working tree and is not included by `git add`, commit, or push. AI traffic uses the localhost MetaCore gateway by default; the service forwards the key only to the configured provider and does not persist it or write it to operation logs. Browser-direct calls require the explicit `VITE_METACORE_ALLOW_DIRECT_AI=true` development override. Each provider can use a bounded 30-to-600-second timeout; the default is 180 seconds.
 
 MetaCore Studio does not currently provide a public cloud AI API. Future supplier integrations should implement the existing `call` and `listModels` adapter contract in a separately secured service with authentication, rate limits, and cost controls. Supplier secrets must never be committed to this repository.
 
 Do not use a shared browser profile for production credentials. Clear the site's browser data before handing the computer to another user, never place real keys in source files, screenshots, issues, or exported configuration, and review the provider's privacy policy before sending source code or datasheets for analysis.
+
+## DeepSeek Harness Runtime
+
+The optional DeepSeek Harness Runtime is selected by default when its source checkout, dependencies, configuration, and credentials are available. It is based on source tag `dsh-v0.1.1-rc.2`; `MetaCore Internal` remains available as a fallback when Harness is not ready.
+
+Install the Harness workspace once with `pnpm install`, then start the localhost service and Vite UI. In `设置`, test and activate a DeepSeek service; Harness tasks reuse its API key, Base URL, model, and output budget. A server-side `DEEPSEEK_API_KEY` remains an optional fallback. The Agent task drawer shows Runtime readiness, session/tool/subagent trajectory, and approval cards. Harness can inspect the authorized workspace through the MetaCore bridge, but file changes and builds become approval records first. It cannot use raw shell or filesystem plugins.
+
+The detailed setup and troubleshooting guide is [`docs/HARNESS_USER_GUIDE.md`](docs/HARNESS_USER_GUIDE.md); the implementation roadmap is [`docs/HARNESS_MIGRATION_PLAN.md`](docs/HARNESS_MIGRATION_PLAN.md).
 
 ## Typical Workflow
 
@@ -248,6 +260,7 @@ server/
 ├── lib/http.mjs         # JSON, CORS, origin, and request-body handling
 ├── security/            # Canonical workspace-path boundary
 ├── services/            # Replaceable AI provider adapter
+├── agent/               # Internal/Harness Runtime, jobs, sessions, approvals, and tools
 └── smoke-test.mjs       # Self-contained local API smoke test
 docs/
 ├── ARCHITECTURE.md      # Module boundaries and dependency direction
@@ -373,3 +386,21 @@ The project marker may exist, but the corresponding tool is not available in `PA
 The repository currently uses an **All Rights Reserved** notice. The source is published on GitHub for reference and collaboration, but it is not granted an OSI-approved open-source license at this time. Do not redistribute, relicense, or use the code commercially without permission from the copyright holder. See [`LICENSE`](LICENSE) for the full text.
 
 © 2026 Leo. All rights reserved.
+
+---
+
+## Author's Note
+
+> The idea I started with in March is one I intend to keep working on.
+
+In March 2026, I began thinking about and working on MetaCore Studio. I wanted to make hardware development feel less like a jump into chip manuals, project configuration, and scattered source files, and more like a guided path from one hardware requirement to a design, firmware, project analysis, and verification. It started as an idea; since then, I have been implementing it gradually, revisiting the details, and learning from each iteration.
+
+Later, I came across IterXAI by 词元开物, which is exploring a related direction and presents the path from an idea to real hardware in a remarkably direct way: requirements, module selection, design, code generation, simulation, PCB fabrication, and physical validation. I was surprised, and I also felt a sense of recognition. We began with a similar question at different times and followed different routes. To me, that is also evidence that AI-assisted hardware development is a real and valuable direction worth pursuing.
+
+There is some overlap between IterXAI and MetaCore Studio, but our centers of gravity are different. IterXAI is especially good at helping makers, students, and prototype teams move quickly from an idea to a first physical board. MetaCore Studio focuses more on ESP32, STM32, custom chips, embedded code, local project analysis, hardware-software consistency, build verification, and maintainable iteration. One leans toward “idea to hardware”; the other toward “requirement to a maintainable, verifiable engineering project.” These paths do not have to be defined only by competition. They may also complement each other at different stages and help make AI-assisted hardware development more complete.
+
+You are welcome to explore [IterXAI](https://www.iterx.ai/) and see how it turns a hardware idea into a real project step by step.
+
+For me, this is not a reason to stop. Seeing others work on a related problem makes the next direction for MetaCore Studio clearer. I intend to keep improving the product and learning seriously from what others do well. Similar directions do not mean that only one of us can exist; they may mean that we are making the same broader possibility real from different angles.
+
+<p align="right"><strong>Leo</strong><br />Author of MetaCore Studio · 2026</p>

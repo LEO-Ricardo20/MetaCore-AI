@@ -15,6 +15,25 @@ describe('AI result validation', () => {
     expect(result.bom[0].quantity).toBe(1)
   })
 
+  it('normalizes hardware_design pinMapping, object wiring, and BOM variants', () => {
+    const result = parseHardwareScheme(JSON.stringify({
+      pinMapping: {
+        depthSensor: { I2C1_SCL: 'PB6', I2C1_SDA: 'PB7' },
+        power: { '12V_IN': 'J1-1' },
+      },
+      bom: [{ name: 'STM32F103C8T6', package: 'LQFP48', quantity: 1, notes: 'MCU' }],
+      wiring: { depthSensor: 'I2C 连接至 PB6/PB7' },
+    }))
+
+    expect(result.description).toContain('硬件方案已生成')
+    expect(result.pins).toEqual(expect.arrayContaining([
+      expect.objectContaining({ pinNumber: 'PB6', pinName: 'I2C1_SCL' }),
+      expect.objectContaining({ pinNumber: 'J1-1', pinName: '12V_IN' }),
+    ]))
+    expect(result.bom[0]).toMatchObject({ model: 'LQFP48', unitPrice: 0 })
+    expect(result.wiring[0]).toMatchObject({ from: 'depthSensor', to: 'I2C 连接至 PB6/PB7' })
+  })
+
   it('rejects generated files that can escape an exported project', () => {
     expect(() => parseCodeFiles(JSON.stringify({
       files: [{ path: '../../secret.txt', content: 'secret', language: 'other' }],

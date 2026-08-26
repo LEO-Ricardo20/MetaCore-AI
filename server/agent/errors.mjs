@@ -12,6 +12,14 @@ export class AgentError extends Error {
 export function normalizeAgentError(error, fallbackCode = 'AGENT_INTERNAL_ERROR') {
   if (error instanceof AgentError) return error
   if (error?.name === 'AbortError') return new AgentError('JOB_CANCELLED', '任务已取消', { status: 409 })
+  if (typeof error?.code === 'string' && error.code) {
+    return new AgentError(error.code, error?.message || 'Agent 运行失败', {
+      cause: error,
+      status: Number.isInteger(error.status) ? error.status : 500,
+      retryable: Boolean(error.retryable),
+      details: error.details,
+    })
+  }
   return new AgentError(fallbackCode, error?.message || 'Agent 运行失败', { cause: error, retryable: false })
 }
 

@@ -13,7 +13,8 @@ import type {
   WorkspaceAnalysis,
   WorkspaceInfo,
 } from './types'
-import type { AgentEvent, AgentJob, AgentSession } from '@/types/agent'
+import type { AgentApproval, AgentEvent, AgentJob, AgentRuntimeStatus, AgentSession } from '@/types/agent'
+import type { AIServiceConfig } from '@/types/ai'
 import type { PipelineStage } from '@/types/project'
 
 const API_BASE = 'http://127.0.0.1:3766/api'
@@ -123,6 +124,25 @@ export function createAgentJob<TPayload = unknown>(input: { projectId: string; s
   return request<AgentJob>('/jobs', { method: 'POST', body: JSON.stringify(input) })
 }
 
+export function getAgentRuntimeStatus() {
+  return request<AgentRuntimeStatus>('/agent/runtime')
+}
+
+export function createAgentTask(input: { projectId: string; goal: string; runtime?: string; sessionId?: string; model?: string; maxTokens?: number; service?: AIServiceConfig }) {
+  return request<AgentJob & { runtime: string }>('/agent/tasks', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function listAgentApprovals(projectId?: string, status?: string) {
+  const query = new URLSearchParams()
+  if (projectId) query.set('projectId', projectId)
+  if (status) query.set('status', status)
+  return request<{ approvals: AgentApproval[] }>(`/agent/approvals${query.size ? `?${query.toString()}` : ''}`)
+}
+
+export function decideAgentApproval(approvalId: string, decision: 'approve' | 'reject') {
+  return request<AgentApproval>(`/agent/approvals/${encodeURIComponent(approvalId)}/${decision}`, { method: 'POST' })
+}
+
 export function getAgentJob<TResult = unknown>(jobId: string) {
   return request<AgentJob<TResult>>(`/jobs/${encodeURIComponent(jobId)}`)
 }
@@ -142,7 +162,7 @@ export function subscribeAgentEvents(
   onError?: (event: Event) => void,
 ) {
   const source = new EventSource(`${API_BASE}/${scope}/${encodeURIComponent(id)}/events`)
-  const eventTypes = ['session.created', 'session.resumed', 'stage.started', 'stage.progress', 'tool.before', 'tool.approval-required', 'tool.executing', 'tool.completed', 'tool.failed', 'validation.started', 'validation.completed', 'build.started', 'build.completed', 'job.cancelled', 'stage.completed', 'stage.failed']
+  const eventTypes = ['session.created', 'session.resumed', 'stage.started', 'stage.progress', 'tool.before', 'tool.approval-required', 'tool.executing', 'tool.completed', 'tool.failed', 'validation.started', 'validation.completed', 'build.started', 'build.completed', 'job.cancelled', 'stage.completed', 'stage.failed', 'agent.status', 'agent.output', 'agent.runtime-event', 'subagent.started', 'subagent.finished', 'approval.requested', 'approval.approved', 'approval.rejected', 'approval.executed', 'approval.failed']
   const handler = (message: MessageEvent) => {
     try { onEvent(JSON.parse(message.data) as AgentEvent) } catch { /* ignore malformed provider events */ }
   }

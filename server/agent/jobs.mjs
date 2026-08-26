@@ -90,6 +90,7 @@ export class JobManager {
       const result = await this.executors[job.stage](job.payload, {
         signal: job.controller.signal,
         job: this.#public(job),
+        emit: (type, data) => this.#persistEvent(job, type, data),
         progress: async (progress, currentAction) => {
           if (job.controller.signal.aborted) throw new DOMException('任务已取消', 'AbortError')
           job.progress = Math.max(0, Math.min(100, Number(progress) || 0)); job.currentAction = currentAction || job.currentAction

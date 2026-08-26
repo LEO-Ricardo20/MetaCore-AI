@@ -1,18 +1,20 @@
 # MetaCore Studio Agent 架构
 
-本文描述 `server/agent` 中的内部 Agent Runtime，以及它与 DeepSeek Harness 的参考关系。当前实现是 **Harness-inspired internal runtime**，不是 DeepSeek Harness 的实际集成。
+本文描述 `server/agent` 的运行时边界，以及它如何以 DeepSeek Harness `dsh-v0.1.1-rc.2` 作为可选执行引擎。服务默认选择 `deepseek-harness`；`internal` 仍作为兼容和无凭据回退运行时保留。
 
 ## 运行时选择
 
 默认运行时：
 
 ```text
-METACORE_AGENT_RUNTIME=internal
+METACORE_AGENT_RUNTIME=deepseek-harness
 ```
 
-`GET /api/health` 会返回 `agentRuntime`。当前代码只实现 `internal`；即使把环境变量设置为 `deepseek-harness`，服务也不会加载 Python SDK、DeepSeek Harness 进程或远程 Harness Runtime。因此部署和产品文案不得宣称已经接入 DeepSeek Harness。
+`GET /api/health` 和 `GET /api/agent/runtime` 会返回当前选择及两个 Runtime 的就绪状态。DeepSeek Harness Runtime 使用 `@deepseek-ai/dsh-sdk-client` 启动旁边源码 checkout 的 `src/packaged-bin.ts`，通过 stdio JSON-RPC 驱动 Cordis；它不是远程 SaaS，也不是 Python SDK。
 
-未来适配器应保持可选，不能让 MetaCore Studio 的项目状态、安全文件操作和 Windows 支持依赖开发者预览版运行时。
+真实执行需要 Harness 源码依赖已经由 `pnpm install` 安装、`harness/cordis.yml` 可读取、设置页已有已验证的 DeepSeek 服务或本地服务环境存在 `DEEPSEEK_API_KEY`，并且 MetaCore 已授权一个工作区。
+
+Harness 适配器保持可选，不能让 MetaCore Studio 的项目状态、安全文件操作和 Windows 支持依赖开发者预览版运行时。
 
 ## 模块结构
 
@@ -27,6 +29,8 @@ server/agent/
 ├── registry.mjs   # 静态 Plugin Registry
 ├── services.mjs   # Service Definition / Provider Registry
 ├── tools.mjs      # Tool Registry 与统一执行流水线
+├── approvals.mjs  # 文件 Diff/构建审批与执行
+└── runtime/       # Internal 与 DeepSeek Harness Runtime 适配器
 └── index.mjs      # 模块导出
 ```
 
@@ -62,6 +66,18 @@ Tool 面向 Agent 或前端暴露能力，只通过权限和稳定服务边界�
 - `run_build`
 - `write_file`
 - `restore_backup`
+
+Harness 侧通过 `harness/metacore-tools.mjs` 暴露一个受控子集：
+
+- `inspect_project`
+- `read_file`
+- `search_files`
+- `run_local_analysis`
+- `validate_pin_assignment`
+- `propose_file_change`
+- `request_build`
+
+Harness 不会直接挂载原始 shell 或 fs-local 插件。高风险工具只调用 MetaCore bridge 创建 `AgentApproval`，由用户在 UI 中批准后再调用已有 `write_file` 或 `run_build`。
 
 静态插件 manifest 同时声明了方案、代码、验证、流程和导出等目标能力名，用于描述演进方向；`GET /api/agent/plugins` 返回的 `tools` 列表才是当前进程实际可执行的工具集合。
 
@@ -107,7 +123,7 @@ tool.before
 
 权限维度包括 `read`、`write`、`build`、`export` 和 `requiresApproval`。未获得写入、构建或导出能力时分别返回 `TOOL_WRITE_FORBIDDEN`、`TOOL_BUILD_FORBIDDEN` 或 `TOOL_EXPORT_FORBIDDEN`；需要审批但未批准时返回 HTTP 428 和 `TOOL_APPROVAL_REQUIRED`。
 
-Tool Pipeline 已提供后端审批门槛与 `tool.approval-required` 事件。前端 diff 审批 UI 尚未完成，因此当前生产流程仍应由现有显式文件写入确认和构建按钮发起高风险操作。
+Tool Pipeline 已提供后端审批门槛与 `tool.approval-required` 事件。Harness 的 Diff/构建审批由 `ApprovalStore` 管理，并通过 `approval.requested`、`approval.approved`、`approval.rejected`、`approval.executed` 和 `approval.failed` 事件同步到任务抽屉。
 
 ## Event Bus
 
@@ -135,6 +151,16 @@ EventBus 为每个事件分配单调递增 ID，并写入以下通道：
 - `build.started`
 - `build.completed`
 - `job.cancelled`
+- `agent.status`
+- `agent.output`
+- `agent.runtime-event`
+- `subagent.started`
+- `subagent.finished`
+- `approval.requested`
+- `approval.approved`
+- `approval.rejected`
+- `approval.executed`
+- `approval.failed`
 
 Job 和 Session 的 `/events` 接口通过 Server-Sent Events 推送事件，并支持 `Last-Event-ID` 或 `?after=<id>` 从当前进程的事件缓存继续读取。
 
@@ -192,7 +218,7 @@ Session 默认存储目录：
 
 Session 元数据保存项目 ID、状态、时间、最后事件 ID和 Job ID 列表。JSONL trajectory 保存脱敏后的事件。服务启动时清理默认超过 7 天的历史 Session。
 
-Session 不默认写入用户工作区。API Key、Authorization、password、token、private key 和常见 secret 字段会被递归脱敏。当前 Session API 可按 ID读取；尚未提供按项目分页查询或通过 JSONL 重放 SSE 的接口。
+Session 不默认写入用户工作区。API Key、Authorization、password、token、private key 和常见 secret 字段会被递归脱敏。当前 Session API 可按 ID 读取；尚未提供按项目分页查询或通过 JSONL 重放 SSE 的接口。
 
 ## 操作日志
 
@@ -247,37 +273,41 @@ Session 不默认写入用户工作区。API Key、Authorization、password、to
 
 为了兼容旧服务商，完全不含 Contract 字段的旧式 JSON 仍可被包裹为 `status: ok`，但新 Prompt 会要求输出标准 envelope。
 
-## DeepSeek Harness 参考关系
+## DeepSeek Harness Runtime
 
-内部运行时借鉴了 DeepSeek Harness 的以下概念：
+真实适配器位于 `server/agent/runtime/deepseek-harness-runtime.mjs`，它只做进程和协议适配，不复制 Harness 的业务逻辑：
 
-- 插件和能力注册。
-- Service Definition / Provider / Consumer 分层。
-- Agent 生命周期事件。
-- 工具执行流水线。
-- 权限与审批。
-- Job、Session 与 trajectory。
-- Streaming/SSE。
-- Token 与耗时计量。
-- 上下文选择和压缩。
+1. 用 `@deepseek-ai/dsh-sdk-client` 启动 Harness 源码的 `src/packaged-bin.ts`。
+2. 通过 `harness/cordis.yml` 组合 JSON-RPC server、DeepSeek adapter、agent spine、session persistence、checkpoint、subagent、todo、token meter 和 compaction。
+3. 将 Harness 的 `session.status`、`session.event`、`subagent.*` 通知映射为 MetaCore `AgentEvent`。
+4. 将任务结果、错误、取消和退出状态回收到 MetaCore Job。
+5. 通过一次启动生成的 bridge token 调用 MetaCore `POST /api/agent/bridge/tools/:toolName`。
 
-未实现的实际集成包括：
+相邻 `deepseek-harness` 仓库是运行时依赖，只读使用，不由本项目修改。由于 SDK 当前没有逐提示词取消 API，取消任务会关闭对应 Harness 子进程；Job 的取消、重试和 UI 状态仍由 MetaCore 管理。
 
-- 未安装或启动 DeepSeek Harness SDK/Runtime。
-- 未加载 Harness 插件包。
-- 未使用 Harness 的 Agent lifecycle executor。
-- 未把工具调用委托给 Harness sandbox。
-- 未实现 Windows 与 Harness 进程间桥接。
-- 未实现 `METACORE_AGENT_RUNTIME=deepseek-harness` 的 adapter。
+## MetaCore 安全边界
 
-## 可选 Adapter 方向
+Harness 的模型可以读取和分析授权工作区，但没有原始 shell 或任意文件系统工具。工具桥的高风险动作只产生审批：
 
-未来的 Adapter 应放在独立模块中，并满足以下约束：
+```text
+Harness propose_file_change
+  -> MetaCore 读取旧文件并计算 Diff
+  -> approval.requested
+  -> 用户批准
+  -> MetaCore write_file（备份 + mtime 冲突检查 + 工作区边界）
 
-1. 实现 MetaCore 的 Service Definition，而不是让前端依赖 Harness 类型。
-2. 将 Harness 事件转换为 `AgentEvent`。
-3. 将 Harness Job 状态转换为 MetaCore Job 状态和稳定错误码。
-4. 复用 MetaCore 工作区路径、备份、冲突检测和构建白名单。
-5. 不允许 Harness 绕过 Tool Policy 直接写文件或执行命令。
-6. 保持 `internal` 为默认和可独立运行的回退实现。
-7. 在 Windows 支持、取消、日志脱敏和恢复测试全部通过前，不在 UI 中标记为可用。
+Harness request_build
+  -> approval.requested
+  -> 用户批准
+  -> MetaCore run_build（固定 profile 白名单 + 超时 + 输出限制）
+```
+
+因此 Harness 的提示词不能证明文件已经修改，也不能把构建命令字符串当作已经执行。最终事实以 MetaCore 工具结果和审批事件为准。
+
+## 当前限制
+
+- Harness 版本为开发预览 `dsh-v0.1.1-rc.2`，当前适配器按源码 checkout 启动。
+- 真实模型需要本地服务环境变量 `DEEPSEEK_API_KEY`，前端设置页不会把 Key 写入服务端配置文件。
+- `ApprovalStore` 当前为内存存储，服务重启后未完成审批不会恢复。
+- Job 和 EventBus 仍为进程内队列；Session JSON/JSONL 会持久化轨迹，但不会恢复运行中的子进程。
+- Runtime 在 Windows 已采用本地子进程和 stdio 设计，但仍应按目标机器继续验收 Node、pnpm、路径和防火墙环境。

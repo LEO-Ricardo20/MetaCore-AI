@@ -1,8 +1,9 @@
 import { create } from 'zustand'
+import type { AITaskClarification } from '@/types/agent'
 
 export type GenerationMode = 'scheme-only' | 'full-generation' | 'code-only' | 'flow-only'
 export type GenerationStage = 'preparing' | 'scheme' | 'scheme-validation' | 'code' | 'code-validation' | 'flow'
-export type GenerationStatus = 'idle' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+export type GenerationStatus = 'idle' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'needs_clarification'
 
 export interface GenerationState {
   projectId: string | null
@@ -20,6 +21,7 @@ export interface GenerationState {
   provider?: string
   error?: string
   warning?: string
+  clarification?: AITaskClarification
   start: (input: Pick<GenerationState, 'projectId' | 'runId' | 'sessionId' | 'jobId' | 'mode' | 'model' | 'provider'>) => void
   update: (updates: Partial<GenerationState>) => void
   finish: (status: Exclude<GenerationStatus, 'idle' | 'running'>, error?: string) => void
@@ -46,13 +48,14 @@ export const useGenerationStore = create<GenerationState>((set) => ({
     stageStartedAt: Date.now(),
     error: undefined,
     warning: undefined,
+    clarification: undefined,
   }),
   update: (updates) => set(updates),
   finish: (status, error) => set({
     status,
-    progress: status === 'succeeded' ? 100 : 0,
+    progress: status === 'succeeded' ? 100 : status === 'needs_clarification' ? 78 : 0,
     error,
-    message: status === 'succeeded' ? '生成任务已完成' : status === 'cancelled' ? '生成任务已取消' : error ?? '生成任务失败',
+    message: status === 'succeeded' ? '生成任务已完成' : status === 'cancelled' ? '生成任务已取消' : status === 'needs_clarification' ? '等待补充信息后继续生成' : error ?? '生成任务失败',
   }),
   clear: () => set({
     projectId: null,
@@ -70,5 +73,6 @@ export const useGenerationStore = create<GenerationState>((set) => ({
     provider: undefined,
     error: undefined,
     warning: undefined,
+    clarification: undefined,
   }),
 }))

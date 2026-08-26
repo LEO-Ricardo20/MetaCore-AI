@@ -159,7 +159,9 @@ try {
   await cdp.waitText('可用构建', 5_000)
   await cdp.evaluate('window.confirm = () => true')
   await clickTitle(cdp, '执行白名单构建命令')
-  await cdp.waitExpression(`document.body?.innerText?.includes('构建成功') && document.body?.innerText?.includes('[SUCCESS]')`, 60_000)
+  // The first PlatformIO build may download the ESP32 toolchain and libraries.
+  // Keep the browser assertion aligned with the server's bounded build window.
+  await cdp.waitExpression(`document.body?.innerText?.includes('构建成功') && document.body?.innerText?.includes('[SUCCESS]')`, 180_000)
   const buildRequest = await cdp.evaluate(`(window.__metacoreFetches ?? []).findLast((item) => item.url.includes('/api/build/run'))`)
   if (buildRequest?.status !== 200 || !buildRequest?.body?.includes('"success":true')) {
     throw new Error(`浏览器构建请求没有成功：${JSON.stringify(buildRequest)}`)

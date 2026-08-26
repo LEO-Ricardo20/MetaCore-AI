@@ -84,7 +84,13 @@ async function createCDP() {
     }
     throw new Error(`浏览器条件等待超时：${expression}`)
   }
-  return { send, evaluate, waitForText, waitForExpression, close: () => socket.close() }
+  async function reload() {
+    await send('Page.reload', { ignoreCache: true })
+    // Give Chrome a short window to detach the old document before the next
+    // Runtime.evaluate poll starts against the new document.
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return { send, evaluate, waitForText, waitForExpression, reload, close: () => socket.close() }
 }
 
 async function clickText(cdp, text) {
@@ -136,7 +142,7 @@ try {
   const cdp = await createCDP()
   await cdp.waitForExpression("location.origin === 'http://127.0.0.1:5173'", 15_000)
   await cdp.evaluate(`localStorage.removeItem('metacore-projects'); localStorage.setItem('metacore-theme', JSON.stringify({ state: { theme: 'light' }, version: 0 })); localStorage.setItem('metacore-ai-config', JSON.stringify({ state: { services: [{ id: 'e2e-mock', name: 'MetaCore Mock（测试）', provider: 'mock', apiKey: '', baseURL: 'http://127.0.0.1:3766/mock', model: 'metacore-deterministic', apiMode: 'chat-completions', enabled: true, mockDelayMs: 2500 }], activeServiceId: 'e2e-mock' }, version: 0 })); 'storage-ready'`)
-  await cdp.send('Page.reload', { ignoreCache: true })
+  await cdp.reload()
   await cdp.waitForText('描述你的硬件需求')
   await cdp.waitForText('ESP32 开发板配置')
   await screenshot(cdp, 'esp32-config-light.png')
@@ -165,7 +171,7 @@ try {
   if (!retryJobs.jobs?.some((job) => job.stage === 'scheme-generation' && job.status === 'succeeded')) throw new Error('重试没有创建成功的方案 Job')
 
   await cdp.evaluate(`(() => { const config = JSON.parse(localStorage.getItem('metacore-ai-config') || '{}'); config.state.services[0].mockDelayMs = 450; localStorage.setItem('metacore-ai-config', JSON.stringify(config)); localStorage.removeItem('metacore-projects'); location.hash = '#/design/requirements'; })()`)
-  await cdp.send('Page.reload', { ignoreCache: true })
+  await cdp.reload()
   await cdp.waitForText('描述你的硬件需求')
   await cdp.waitForExpression(`Boolean(document.querySelector('select[aria-label="ESP32 开发板"] option[value="esp32-c3-devkitm-1"]'))`, 5_000)
   await selectValue(cdp, 'select[aria-label="ESP32 开发板"]', 'esp32-c3-devkitm-1')
@@ -215,7 +221,7 @@ try {
   await cdp.evaluate("location.hash = '#/design/pins'")
   await cdp.waitForText('引脚分配')
   await cdp.evaluate(`(() => { const stored = JSON.parse(localStorage.getItem('metacore-projects') || '{}'); const active = stored.state?.projects?.find((item) => item.id === stored.state.currentProjectId) ?? stored.state?.projects?.[0]; if (!active?.artifacts?.flow) return false; active.artifacts.flow.status = 'stale'; active.artifacts.flow.staleReason = 'E2E 视口适配检查'; localStorage.setItem('metacore-projects', JSON.stringify(stored)); location.hash = '#/verification/consistency'; return true; })()`)
-  await cdp.send('Page.reload', { ignoreCache: true })
+  await cdp.reload()
   await cdp.waitForText('代码与硬件方案一致性')
   await clickText(cdp, '运行一致性检查')
   await cdp.waitForText('一致性校验')
@@ -238,7 +244,7 @@ try {
   await cdp.waitForText('项目管理')
   await screenshot(cdp, 'projects-primary-actions-light.png')
   await cdp.evaluate(`localStorage.setItem('metacore-theme', JSON.stringify({ state: { theme: 'dark' }, version: 0 })); location.hash = '#/workspace'`)
-  await cdp.send('Page.reload', { ignoreCache: true })
+  await cdp.reload()
   await cdp.waitForText('项目研发状态')
   await screenshot(cdp, 'workspace-dark.png')
   await cdp.evaluate("location.hash = '#/design/scheme'")
@@ -260,7 +266,7 @@ try {
   if (!jobs.jobs?.some((job) => job.stage === 'scheme-validation' && job.status === 'succeeded')) throw new Error('引脚校验 Job 未成功完成')
   if (!jobs.jobs?.some((job) => job.stage === 'code-generation' && job.status === 'succeeded')) throw new Error('代码 Job 未成功完成')
   if (!jobs.jobs?.some((job) => job.stage === 'flow-generation' && job.status === 'succeeded')) throw new Error('流程 Job 未成功完成')
-  if (errors.length) throw new Error(`浏览器控制台错误：${errors.join(' | ')}`)
+  if (errors.length) throw new Error(`浏览器控制台错误：${errors.map((error) => JSON.stringify(error)).join(' | ')}`)
   console.log(JSON.stringify({ ok: true, projectId: project.id, files: project.codeFiles.length, flowNodes: project.flowNodes.length, jobs: jobs.jobs.map((job) => ({ stage: job.stage, status: job.status, durationMs: job.durationMs })) }, null, 2))
   cdp.close()
 } catch (error) {

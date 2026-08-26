@@ -16,7 +16,12 @@ export function corsHeaders(origin = '') {
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '600',
   }
-  if (isAllowedOrigin(origin)) headers['Access-Control-Allow-Origin'] = origin
+  if (isAllowedOrigin(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin
+    // Chromium may preflight a page-to-loopback POST as a private-network
+    // request. The origin allowlist above still limits access to local pages.
+    headers['Access-Control-Allow-Private-Network'] = 'true'
+  }
   return headers
 }
 

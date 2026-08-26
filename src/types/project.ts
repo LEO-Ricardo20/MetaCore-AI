@@ -1,5 +1,6 @@
 import type { ChipTarget, ProjectFormat, PinAssignment, BOMItem, WiringEntry } from './hardware'
 import type { Esp32ProjectConfig } from './esp32'
+import type { AITaskClarification } from './agent'
 
 export const PROJECT_SCHEMA_VERSION = 3
 
@@ -116,6 +117,21 @@ export interface HardwareScheme {
   risks?: Array<{ severity: 'info' | 'warning' | 'error'; message: string; evidence?: string }>
 }
 
+/** 用户已确认的 AI 选型结果，作为方案生成的输入证据保存。 */
+export interface HardwareModelSelection {
+  items: Array<{
+    question: string
+    selectedModel: string
+    selectedAnswer: string
+    selectedCategory?: 'common' | 'optimal' | 'value' | 'best'
+    rationale?: string
+    source: 'user' | 'ai-candidate' | 'ai-auto'
+  }>
+  priorities: Record<'common' | 'optimal' | 'value' | 'best', number>
+  safetySummary?: string
+  confirmedAt: number
+}
+
 export interface CodeFile {
   path: string
   content: string
@@ -163,6 +179,10 @@ export interface Project {
   runs: ProjectRun[]
   versions: ProjectVersion[]
   validation: ProjectValidationSummary
+  /** 最近一次生成暂停时要求用户补充的结构化问题。 */
+  pendingClarification?: AITaskClarification
+  /** 用户已确认的器件选型，在方案重新生成时作为明确约束。 */
+  modelSelection?: HardwareModelSelection
   lastSessionId?: string
   createdAt: number
   updatedAt: number

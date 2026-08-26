@@ -21,14 +21,14 @@ const PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'custom', label: '自定义 OpenAI 兼容服务' },
 ]
 
-const DEFAULTS: Record<AIProvider, { baseURL: string; model: string; apiMode: AIAPIMode }> = {
-  deepseek: { baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat', apiMode: 'chat-completions' },
-  siliconflow: { baseURL: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', apiMode: 'chat-completions' },
-  qwen: { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', apiMode: 'chat-completions' },
-  openai: { baseURL: 'https://api.openai.com/v1', model: 'gpt-4o', apiMode: 'responses' },
-  ollama: { baseURL: 'http://127.0.0.1:11434/v1', model: 'llama3', apiMode: 'chat-completions' },
-  mock: { baseURL: 'http://127.0.0.1:3766/mock', model: 'metacore-deterministic', apiMode: 'chat-completions' },
-  custom: { baseURL: '', model: '', apiMode: 'chat-completions' },
+const DEFAULTS: Record<AIProvider, { baseURL: string; model: string; apiMode: AIAPIMode; timeoutSeconds: number; maxOutputTokens: number }> = {
+  deepseek: { baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat', apiMode: 'chat-completions', timeoutSeconds: 180, maxOutputTokens: 8192 },
+  siliconflow: { baseURL: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V4-Flash', apiMode: 'chat-completions', timeoutSeconds: 180, maxOutputTokens: 8192 },
+  qwen: { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', apiMode: 'chat-completions', timeoutSeconds: 180, maxOutputTokens: 8192 },
+  openai: { baseURL: 'https://api.openai.com/v1', model: 'gpt-4o', apiMode: 'responses', timeoutSeconds: 180, maxOutputTokens: 8192 },
+  ollama: { baseURL: 'http://127.0.0.1:11434/v1', model: 'llama3', apiMode: 'chat-completions', timeoutSeconds: 180, maxOutputTokens: 8192 },
+  mock: { baseURL: 'http://127.0.0.1:3766/mock', model: 'metacore-deterministic', apiMode: 'chat-completions', timeoutSeconds: 30, maxOutputTokens: 8192 },
+  custom: { baseURL: '', model: '', apiMode: 'chat-completions', timeoutSeconds: 180, maxOutputTokens: 8192 },
 }
 
 export default function AIServiceForm({ initial, onClose }: Props) {
@@ -43,6 +43,8 @@ export default function AIServiceForm({ initial, onClose }: Props) {
     baseURL: initial?.baseURL ?? DEFAULTS.deepseek.baseURL,
     model: initial?.model ?? DEFAULTS.deepseek.model,
     apiMode: initial ? resolveAIAPIMode(initial) : DEFAULTS.deepseek.apiMode,
+    timeoutSeconds: Math.round((initial?.timeoutMs ?? 180_000) / 1_000),
+    maxOutputTokens: initial?.maxOutputTokens ?? 8192,
   })
   const [showKey, setShowKey] = useState(false)
   const [error, setError] = useState('')
@@ -98,6 +100,8 @@ export default function AIServiceForm({ initial, onClose }: Props) {
         baseURL,
         model: form.model.trim(),
         apiMode: form.apiMode,
+        timeoutMs: form.timeoutSeconds * 1_000,
+        maxOutputTokens: form.maxOutputTokens,
         enabled: false,
       })
       setModelOptions(models)
@@ -117,6 +121,8 @@ export default function AIServiceForm({ initial, onClose }: Props) {
     const model = form.model.trim()
     const apiKey = form.apiKey.trim()
     const rawBaseURL = form.baseURL.trim().replace(/\/+$/, '')
+    const timeoutSeconds = Number(form.timeoutSeconds)
+    const maxOutputTokens = Number(form.maxOutputTokens)
 
     if (!name || !rawBaseURL || !model) {
       setError('名称、Base URL 和模型不能为空。')
@@ -124,6 +130,14 @@ export default function AIServiceForm({ initial, onClose }: Props) {
     }
     if (needsKey && !apiKey) {
       setError('该服务需要 API Key。Ollama 本地服务可以不填写。')
+      return
+    }
+    if (!Number.isFinite(timeoutSeconds) || timeoutSeconds < 30 || timeoutSeconds > 600) {
+      setError('超时时间必须在 30 到 600 秒之间。')
+      return
+    }
+    if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 256 || maxOutputTokens > 262144) {
+      setError('最大输出 Token 必须是 256 到 262144 之间的整数。')
       return
     }
     try {
@@ -140,6 +154,8 @@ export default function AIServiceForm({ initial, onClose }: Props) {
       || initial.baseURL.replace(/\/+$/, '') !== rawBaseURL
       || initial.model !== model
       || resolveAIAPIMode(initial) !== form.apiMode
+      || (initial.timeoutMs ?? 180_000) !== timeoutSeconds * 1_000
+      || (initial.maxOutputTokens ?? 8192) !== maxOutputTokens
     ))
     const payload = {
       name,
@@ -148,6 +164,8 @@ export default function AIServiceForm({ initial, onClose }: Props) {
       baseURL: rawBaseURL,
       model,
       apiMode: form.apiMode,
+      timeoutMs: timeoutSeconds * 1_000,
+      maxOutputTokens,
       enabled: initial ? (connectionChanged ? false : initial.enabled) : false,
     }
 
@@ -213,6 +231,8 @@ export default function AIServiceForm({ initial, onClose }: Props) {
                 {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
+            {form.provider === 'deepseek' && <Hint isDark={isDark}>填写 DeepSeek 开放平台创建的 API Key。当前服务设为“使用中”后，设计生成和 DeepSeek Harness Agent 都会使用它。</Hint>}
+            {form.provider === 'siliconflow' && <Hint isDark={isDark}>选择硅基流动中的 DeepSeek 模型并设为“使用中”后，设计生成和 DeepSeek Harness Agent 都可以复用它。</Hint>}
           </Field>
 
           <Field label="Base URL" isDark={isDark}>
@@ -229,6 +249,7 @@ export default function AIServiceForm({ initial, onClose }: Props) {
               }))
             }} placeholder="https://api.example.com/v1" className={inputClass} />
             {form.provider === 'custom' && <Hint isDark={isDark}>自定义服务需要兼容所选 OpenAI API 协议，Base URL 通常以 /v1 结尾。</Hint>}
+            {form.provider === 'deepseek' && <Hint isDark={isDark}>官方地址是 https://api.deepseek.com/v1。不要在末尾再填写 /chat/completions。</Hint>}
             {form.provider === 'ollama' && <Hint isDark={isDark}>默认地址为 http://127.0.0.1:11434/v1，请先运行 ollama serve。</Hint>}
             {form.provider === 'mock' && <Hint isDark={isDark}>仅用于本地 E2E 和流程验收，不代表真实模型能力。</Hint>}
           </Field>
@@ -270,6 +291,17 @@ export default function AIServiceForm({ initial, onClose }: Props) {
             </datalist>
             {modelStatus && <Hint isDark={isDark}>{modelStatus}</Hint>}
           </Field>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="请求超时（秒）" isDark={isDark}>
+              <input type="number" min={30} max={600} step={30} value={form.timeoutSeconds} onChange={(event) => setForm((current) => ({ ...current, timeoutSeconds: Number(event.target.value) }))} className={inputClass} />
+              <Hint isDark={isDark}>硬件方案和代码生成建议 180 秒；慢速推理模型可设为 300 到 600 秒。</Hint>
+            </Field>
+            <Field label="最大输出 Token" isDark={isDark}>
+              <input type="number" min={256} max={262144} step={256} value={form.maxOutputTokens} onChange={(event) => setForm((current) => ({ ...current, maxOutputTokens: Number(event.target.value) }))} className={inputClass} />
+              <Hint isDark={isDark}>方案建议 8192；较大的固件工程可提高到 16384。</Hint>
+            </Field>
+          </div>
         </div>
 
         {error && (

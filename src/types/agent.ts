@@ -19,6 +19,16 @@ export type AgentEventType =
   | 'job.cancelled'
   | 'stage.completed'
   | 'stage.failed'
+  | 'agent.status'
+  | 'agent.output'
+  | 'agent.runtime-event'
+  | 'subagent.started'
+  | 'subagent.finished'
+  | 'approval.requested'
+  | 'approval.approved'
+  | 'approval.rejected'
+  | 'approval.executed'
+  | 'approval.failed'
 
 export interface AgentEvent<T = unknown> {
   id: number
@@ -33,7 +43,7 @@ export interface AgentEvent<T = unknown> {
 export interface AgentJob<TResult = unknown> {
   id: string
   projectId: string
-  stage: PipelineStage
+  stage: PipelineStage | 'agent-task'
   status: JobStatus
   createdAt: number
   startedAt?: number
@@ -65,6 +75,53 @@ export interface AgentSession {
   metadata: Record<string, string | number | boolean>
 }
 
+export type AgentRuntimeId = 'internal' | 'deepseek-harness'
+
+export interface AgentRuntimeInfo {
+  id: AgentRuntimeId | string
+  label: string
+  ready: boolean
+  experimental: boolean
+  capabilities: string[]
+  sourceAvailable?: boolean
+  dependenciesInstalled?: boolean
+  configAvailable?: boolean
+  credentialConfigured?: boolean
+  acceptsTaskCredential?: boolean
+  harnessRoot?: string
+  configPath?: string
+  version?: string
+}
+
+export interface AgentRuntimeStatus {
+  selected: AgentRuntimeId | string
+  runtimes: AgentRuntimeInfo[]
+}
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'
+
+export interface AgentApproval {
+  id: string
+  projectId: string
+  sessionId: string
+  jobId: string
+  runtime: AgentRuntimeId | string
+  toolName: string
+  kind: 'file-diff' | 'build' | 'action' | string
+  title: string
+  reason: string
+  risk: 'low' | 'medium' | 'high' | string
+  args: Record<string, unknown>
+  preview: Record<string, unknown> | null
+  status: ApprovalStatus
+  createdAt: number
+  decidedAt?: number
+  executedAt?: number
+  failedAt?: number
+  result?: unknown
+  error?: string
+}
+
 export interface ToolPermission {
   workspace?: string
   read: boolean
@@ -94,6 +151,14 @@ export interface AgentErrorContract {
 }
 
 export type AITaskStatus = 'ok' | 'needs_clarification' | 'invalid'
+
+/** AI 无法安全继续时，交给用户确认的结构化问题。 */
+export interface AITaskClarification {
+  taskType: string
+  questions: string[]
+  createdAt: number
+  generationMode?: 'scheme-only' | 'full-generation' | 'code-only' | 'flow-only'
+}
 
 export interface AITaskEvidence {
   source: string
