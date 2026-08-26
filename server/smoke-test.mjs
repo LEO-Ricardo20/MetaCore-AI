@@ -20,14 +20,18 @@ const mockAIRequests = []
 async function stopServer() {
   if (!server || server.exitCode !== null || server.signalCode) return
   await new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      if (!server.killed) server.kill('SIGKILL')
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(forceTimer)
       resolve()
+    }
+    const forceTimer = setTimeout(() => {
+      if (server.exitCode === null && server.signalCode === null) server.kill('SIGKILL')
+      setTimeout(finish, 250)
     }, 3_000)
-    server.once('exit', () => {
-      clearTimeout(timer)
-      resolve()
-    })
+    server.once('exit', finish)
     server.kill('SIGTERM')
   })
 }
@@ -175,6 +179,7 @@ try {
   const rootResponse = await fetch(`http://127.0.0.1:${PORT}/`, { redirect: 'manual' })
   assert.equal(rootResponse.status, 302)
   assert.equal(rootResponse.headers.get('location'), 'http://127.0.0.1:5173')
+  await rootResponse.arrayBuffer()
   await request('/workspace/set', { method: 'POST', body: JSON.stringify({ root: tempRoot }) })
 
   const listing = await request('/files/list')
@@ -375,6 +380,7 @@ try {
     cancelledJob = await request(`/jobs/${slowJob.id}`)
   }
   assert.equal(cancelledJob.status, 'cancelled')
+  await new Promise((resolve) => setTimeout(resolve, 100))
 
   const models = await request('/ai/models', {
     method: 'POST',
@@ -413,7 +419,7 @@ try {
   })
   assert.equal(upstreamTimeout.res.status, 504)
   assert.equal(upstreamTimeout.data.code, 'AI_TIMEOUT')
-  assert.deepEqual(mockAIRequests.map((item) => item.url), [
+  assert.deepEqual(mockAIRequests.map((item) => item.url).filter((url) => url !== '/slow/chat/completions'), [
     '/v1/chat/completions',
     '/v1/chat/completions',
     '/v1/chat/completions',

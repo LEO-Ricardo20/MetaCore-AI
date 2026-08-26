@@ -1634,6 +1634,7 @@ const shutdown = () => {
   if (shuttingDown) return
   shuttingDown = true
   server.close()
+  server.closeAllConnections?.()
   void runtimeManager.close()
 }
 process.once('SIGINT', shutdown)
