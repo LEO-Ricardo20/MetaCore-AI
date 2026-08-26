@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive, History, CircuitBoard } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, BookOpen, Zap, FileCode, GitBranch, Settings, HardDrive, History, CircuitBoard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/store/themeStore'
 import { APP_RELEASE_DATE, APP_VERSION_LABEL } from '@/config/app'
@@ -11,13 +12,14 @@ const SECTIONS = [
     color: 'cyan',
     title: '快速开始',
     steps: [
-      { title: '配置 AI 服务', desc: '在「设置」页面添加你的 API Key，支持 DeepSeek、硅基流动、通义千问、OpenAI、Ollama。配置完成后点击「测试」验证连接。' },
-      { title: '输入硬件需求', desc: '在「方案」页面输入你想要实现的硬件功能。例如：「做一个 AI 桌宠，需要 OLED 显示表情、播放声音、检测温湿度」。' },
-      { title: '生成硬件方案', desc: 'ESP32 项目先选择真实开发板/模组，再确认框架、Flash、PSRAM、分区和串口速度。其他芯片继续使用预置或自定义规格。' },
-      { title: '生成代码工程', desc: '点击「生成工程代码」，AI 根据方案和芯片规格生成模块化代码，生成后自动进行一致性自检。当方案中包含 SSD1306 OLED 或 DHT 温湿度传感器时，系统会自动注入经验证的驱动模板，代码页顶栏会显示绿色「驱动已注入」标签，生成的驱动代码可直接上板编译。' },
-      { title: '导出使用', desc: '点击「导出 ZIP」下载完整工程包，或点击「导出 PDF」获取方案文档。BOM 价格仅供参考。' },
-      { title: '自定义芯片', desc: '点击侧边栏「芯片」进入芯片管理，支持三种方式添加自定义芯片：AI 识图（上传 PDF）、AI 助填、手动配置。' },
-      { title: '了解更多', desc: '点击侧边栏「关于」查看平台功能特性、技术栈、版权信息及免责声明。' },
+      { title: '启动完整模式', desc: 'Windows 双击 start.bat（旧入口 start-local.bat 也可以），它会检查依赖、启动 localhost 服务并打开 Web 前端。完整模式才能使用本地工程分析和 AI 网关。' },
+      { title: '创建或选择项目', desc: '从工作台点击「从需求开始」创建项目；已有项目先在侧栏 Project Context 中选中，再继续上次的阶段。', to: '/workspace' },
+      { title: '配置并测试 AI', desc: '进入「设置」添加 API Key，选择模型后点击「测试」并启用服务。只做界面浏览时可以跳过，但生成方案和代码需要可用的 AI 服务。', to: '/settings' },
+      { title: '填写需求并确认型号', desc: '在「设计 → 需求」描述目标、供电、环境和外设。未写明具体器件时，先在型号确认对话框查看候选并确认，不要直接跳过。', to: '/design/requirements' },
+      { title: '生成并审查硬件方案', desc: '先选真实开发板/模组与框架，再核对 Flash、PSRAM、分区、串口、GPIO、BOM 和接线；发现过期或无效产物时先重新生成。', to: '/design/review' },
+      { title: '生成固件工程', desc: '进入「实现」生成模块化代码。系统会自动做代码与方案一致性检查，SSD1306 OLED、DHT 等已支持外设会注入经过验证的驱动模板。', to: '/implementation/code' },
+      { title: '执行验证', desc: '在「验证」依次运行一致性、流程图、本地分析、安全和构建检查；构建命令只使用检测到的白名单工具。', to: '/verification' },
+      { title: '导出和迭代', desc: '通过「实现」导出 ZIP，通过「验证 → 发布检查」确认交付，再导出 PDF 或 .metacore.json。上游需求、芯片或代码变化后，先处理 stale 产物再发布。', to: '/verification/release' },
     ],
   },
   {
@@ -362,6 +364,21 @@ export default function HelpPage() {
               </div>
             ) : (
               <>
+                {activeSection === 'quickstart' && (
+                  <div className="surface-panel border-cyan-500/20 bg-cyan-500/5 p-5 slide-in-right">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-400">Recommended path</p>
+                        <h2 className={cn('mt-1 text-base font-semibold', isDark ? 'text-white' : 'text-slate-800')}>第一次使用只需走这一条线</h2>
+                        <p className={cn('mt-2 max-w-2xl text-xs leading-5', isDark ? 'text-slate-300' : 'text-slate-600')}>启动完整模式后，按“项目 → AI → 需求 → 方案 → 实现 → 验证 → 导出”的顺序操作。每一步的产物都会保存到当前项目，后续修改会自动提示需要重新验证。</p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Link to="/workspace" className="btn-primary inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold text-white"><ArrowRight size={13} />打开工作台</Link>
+                        <Link to="/settings" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-cyan-400/50"><Settings size={13} />配置 AI</Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="slide-in-right">
                   <h2 className={cn('text-lg font-bold mb-4 flex items-center gap-2', isDark ? 'text-white' : 'text-slate-800')}>
                     <currentSection.icon size={18} className={colorMap[currentSection.color].text} />
@@ -372,7 +389,7 @@ export default function HelpPage() {
                       <div key={i} className="glass-card p-4">
                         <div className="flex items-start gap-3">
                           <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5', colorMap[currentSection.color].bg, colorMap[currentSection.color].text)}>{i + 1}</div>
-                          <div><h3 className={cn('text-sm font-semibold mb-1', isDark ? 'text-white' : 'text-slate-800')}>{step.title}</h3><p className={cn('text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>{step.desc}</p></div>
+                          <div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className={cn('text-sm font-semibold', isDark ? 'text-white' : 'text-slate-800')}>{step.title}</h3>{'to' in step && typeof step.to === 'string' ? <Link to={step.to} className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200">打开入口 <ArrowRight size={12} /></Link> : null}</div><p className={cn('mt-1 text-xs leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500')}>{step.desc}</p></div>
                         </div>
                       </div>
                     ))}

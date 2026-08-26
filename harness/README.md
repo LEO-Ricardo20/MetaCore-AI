@@ -21,6 +21,12 @@ cd ..\MetaCore-Studio-Harness
 npm run dev:server
 ```
 
+For a normal Windows run, use the project root `start.bat` after both projects
+have their dependencies installed. It starts or reuses the localhost service,
+waits for the health endpoint, and starts the Vite UI. `start-local.bat` is a
+compatibility alias. Start the two commands manually when you need separate
+logs or want to debug Harness startup.
+
 The normal UI flow is to configure and test an official DeepSeek service in
 Settings. Harness prefers that verified official service; when it is not
 available, a verified SiliconFlow service whose model contains `DeepSeek` is

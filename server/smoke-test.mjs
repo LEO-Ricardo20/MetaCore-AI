@@ -17,6 +17,21 @@ let server
 let mockAIProvider
 const mockAIRequests = []
 
+async function stopServer() {
+  if (!server || server.exitCode !== null || server.signalCode) return
+  await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (!server.killed) server.kill('SIGKILL')
+      resolve()
+    }, 3_000)
+    server.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+    server.kill('SIGTERM')
+  })
+}
+
 async function requestRaw(route, init) {
   const res = await fetch(`${API}${route}`, {
     ...init,
@@ -424,7 +439,7 @@ try {
     aiProxyRequests: mockAIRequests.length,
   }, null, 2))
 } finally {
-  if (server && !server.killed) server.kill()
+  await stopServer()
   if (mockAIProvider?.listening) await new Promise((resolve) => mockAIProvider.close(resolve))
   await fs.rm(tempRoot, { recursive: true, force: true })
   await fs.rm(externalRoot, { recursive: true, force: true })

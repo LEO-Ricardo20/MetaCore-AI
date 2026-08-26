@@ -1629,6 +1629,12 @@ server.listen(PORT, HOST, () => {
   }
 })
 
-const shutdown = () => { void runtimeManager.close() }
+let shuttingDown = false
+const shutdown = () => {
+  if (shuttingDown) return
+  shuttingDown = true
+  server.close()
+  void runtimeManager.close()
+}
 process.once('SIGINT', shutdown)
 process.once('SIGTERM', shutdown)

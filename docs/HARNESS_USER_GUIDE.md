@@ -30,7 +30,9 @@ npm ci
 
 ## 启动
 
-推荐打开两个 PowerShell。API Key 可以稍后在界面设置，不必先写环境变量：
+第一次使用推荐直接双击项目根目录的 `start.bat`。它会检查 Node.js 和依赖，启动或复用 localhost 服务，等待 `http://127.0.0.1:3766/api/health` 可用后，再启动 Vite 前端并打开浏览器。旧入口 `start-local.bat` 只是兼容别名。API Key 可以稍后在界面设置，不必先写环境变量。
+
+如果需要手动启动或排查问题，再打开两个 PowerShell：
 
 ```powershell
 # PowerShell A：本地服务和 Harness Runtime
@@ -45,6 +47,8 @@ npm run dev
 ```
 
 浏览器打开 Vite 输出的地址，默认一般是 `http://127.0.0.1:5173`。localhost 服务默认监听 `127.0.0.1:3766`。
+
+启动后先打开侧栏的“新手教程”，按“设置 AI → 项目 → 需求 → 方案 → 实现 → 验证 → 导出”的顺序操作。
 
 启动后先检查：
 

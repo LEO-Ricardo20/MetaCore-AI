@@ -136,18 +136,37 @@ VPS.Town is a platform focused on VPS and cloud server services, providing stabl
 
 ## Quick Start
 
-### Browser application
+### First run: recommended complete mode
+
+Complete mode starts both the Web UI and the localhost engineering service. This is the recommended path because it enables the AI gateway, local project analysis, backups, and build verification.
 
 ```bash
 git clone https://github.com/LEO-Ricardo20/MetaCore-Studio.git
 cd MetaCore-Studio
 npm ci
+```
+
+On Windows, double-click `start.bat` after installing dependencies. The script checks Node.js and dependencies, starts or reuses the service at `127.0.0.1:3766`, waits for its health check, then starts Vite and opens the browser. `start-local.bat` remains as a compatibility alias with the same behavior.
+
+You can also start the two processes manually:
+
+```bash
+# Terminal 1: localhost engineering service and AI gateway
+npm run dev:server
+
+# Terminal 2: Web UI
 npm run dev
 ```
 
-Vite will print the local URL, normally `http://localhost:5173`.
+Vite normally serves `http://127.0.0.1:5173` or `http://localhost:5173`. On first use, open the **New User Tutorial** from the sidebar and follow the order `Settings -> Requirement -> Scheme -> Implementation -> Verification -> Export`.
 
-For Windows, `start.bat` starts the browser-only application. It does not need the local file service.
+### Browser-only mode
+
+```bash
+npm run dev
+```
+
+Browser-only mode is useful for viewing the interface and features that do not need local files. It does not start the localhost service, so the local workspace, AI gateway, file backups, and build verification are unavailable; browser-direct AI calls may also be limited by CORS.
 
 ## Local Engineering Mode
 
@@ -209,13 +228,16 @@ The detailed setup and troubleshooting guide is [`docs/HARNESS_USER_GUIDE.md`](d
 
 ## Typical Workflow
 
-1. Open `设置` and configure an AI provider.
-2. Open `方案`, describe the hardware requirement, and select a target chip and project format.
-3. Generate the hardware scheme and review the pin diagram, BOM, and wiring table.
-4. Generate firmware code and run the built-in AI consistency check.
-5. Open `流程` to inspect the generated execution flow.
-6. Export a ZIP project or PDF design document.
-7. Optionally open `本地`, select an existing embedded project, scan it, and review the diagnosis report.
+1. Start complete mode with `start.bat` on Windows, or start `npm run dev:server` and `npm run dev` in separate terminals.
+2. Open **New User Tutorial** once to understand the recommended path and the meaning of each project stage.
+3. Open `设置`, configure an AI provider, test it, and mark it as active.
+4. Open `项目` and create or select the project you want to work on.
+5. In `需求`, describe the hardware goal, constraints, environment, and target chip. Confirm any suggested component models before generation.
+6. In `方案`, generate the hardware design and review the pin assignment, BOM, wiring table, risks, and assumptions.
+7. In `实现`, generate the firmware project, inspect the files, and run the hardware-software consistency check.
+8. In `验证`, inspect the flow, scan a local workspace when needed, and run an allowlisted build or other quality checks.
+9. Export the ZIP firmware project or PDF design document.
+10. After changing requirements, chips, pins, or code, rerun the affected generation and verification steps. Treat older artifacts as stale until they are checked again.
 
 ## Example Project
 

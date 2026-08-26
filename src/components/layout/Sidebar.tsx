@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Activity, Boxes, ChevronLeft, ChevronRight, Code2, ExternalLink, FolderKanban, Github, HelpCircle, Info, LayoutDashboard, Menu, Moon, Settings, ShieldCheck, Sun, X } from 'lucide-react'
+import { Activity, BookOpen, Boxes, ChevronLeft, ChevronRight, Code2, ExternalLink, FolderKanban, Github, Info, LayoutDashboard, Menu, Moon, Settings, ShieldCheck, Sun, X } from 'lucide-react'
 import MetaCoreLogo from '@/components/brand/MetaCoreLogo'
 import PendingIssuesMenu from '@/components/project/PendingIssuesMenu'
 import { getFirstPendingRoute } from '@/components/project/pendingIssues'
@@ -15,6 +15,7 @@ const SIDEBAR_KEY = 'metacore-sidebar-collapsed'
 
 const primaryNav = [
   { to: '/workspace', icon: LayoutDashboard, label: '工作台' },
+  { to: '/help', icon: BookOpen, label: '新手教程' },
   { to: '/design', icon: Boxes, label: '设计' },
   { to: '/implementation', icon: Code2, label: '实现' },
   { to: '/verification', icon: ShieldCheck, label: '验证' },
@@ -23,7 +24,6 @@ const primaryNav = [
 
 const systemNav = [
   { to: '/settings', icon: Settings, label: '设置' },
-  { to: '/help', icon: HelpCircle, label: '帮助' },
   { to: '/about', icon: Info, label: '关于' },
 ]
 

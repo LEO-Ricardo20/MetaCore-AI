@@ -14,7 +14,7 @@ npm run dev
 npm run dev:server
 ```
 
-The frontend and localhost service run as separate processes. Do not commit API keys, local workspace data, generated backups, or provider credentials.
+The frontend and localhost service run as separate processes. On Windows, `start.bat` starts the complete mode and is useful for a quick manual check; `start-local.bat` is a compatibility alias. Do not commit API keys, local workspace data, generated backups, or provider credentials.
 
 ### Change workflow
 
@@ -50,7 +50,7 @@ npm run dev
 npm run dev:server
 ```
 
-前端和本地服务需要分别启动。请勿提交 API Key、本地工作区内容、自动备份文件或服务商凭据。
+前端和本地服务需要分别启动。Windows 可以双击 `start.bat` 启动完整模式，`start-local.bat` 为兼容旧入口。请勿提交 API Key、本地工作区内容、自动备份文件或服务商凭据。
 
 ### 修改流程
 
