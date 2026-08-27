@@ -1,27 +1,50 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { selectCurrentProject, useProjectStore } from '@/store/projectStore'
-import { Download, FileDown, FileText, Loader2 } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ArrowRight, Download, FileDown, FileText, Loader2 } from 'lucide-react'
 
 export default function ExportButtons() {
+  const navigate = useNavigate()
   const project = useProjectStore(selectCurrentProject)
   const [zipping, setZipping] = useState(false)
   const [pdffing, setPdffing] = useState(false)
   const [markdowning, setMarkdowning] = useState(false)
-  const requiredArtifacts = ['scheme', 'pinMap', 'bom', 'wiring', 'code', 'flow', 'consistencyReport', 'releaseReport'] as const
-  const staleArtifacts = project
-    ? Object.entries(project.artifacts).some(([key, artifact]) => {
+  const coreArtifacts = ['scheme', 'pinMap', 'bom', 'wiring', 'code', 'flow'] as const
+  const verificationArtifacts = ['consistencyReport', 'buildResult', 'releaseReport'] as const
+  const artifactLabels: Record<string, string> = {
+    scheme: '硬件方案',
+    pinMap: '引脚映射',
+    bom: 'BOM',
+    wiring: '接线',
+    code: '固件工程',
+    flow: '流程图',
+    consistencyReport: '一致性检查',
+    buildResult: '构建验证',
+    releaseReport: '发布检查',
+  }
+  const coreStaleArtifacts = project
+    ? coreArtifacts.filter((key) => ['stale', 'invalid'].includes(project.artifacts[key].status))
+    : []
+  const missingCoreArtifacts = project
+    ? coreArtifacts.filter((key) => !['fresh', 'valid'].includes(project.artifacts[key].status))
+    : []
+  const pendingVerification = project
+    ? verificationArtifacts.filter((key) => {
       if (key === 'buildResult' && project.verification?.build?.status === 'skipped') return false
-      return artifact.status === 'stale' || artifact.status === 'invalid'
+      return !['fresh', 'valid'].includes(project.artifacts[key].status)
     })
-    : false
+    : []
   const blockedReason = !project
     ? '当前没有项目'
-    : staleArtifacts
-      ? '存在过期或无效产物，请先重新生成并验证'
-      : requiredArtifacts.some((key) => !['fresh', 'valid'].includes(project.artifacts[key].status))
-        ? '发布检查尚未通过，请先完成验证工作区的所有检查'
+    : coreStaleArtifacts.length
+      ? `核心产物已过期或无效：${coreStaleArtifacts.map((key) => artifactLabels[key]).join('、')}`
+      : missingCoreArtifacts.length
+        ? `核心产物尚未完成：${missingCoreArtifacts.map((key) => artifactLabels[key]).join('、')}`
         : undefined
   const blocked = Boolean(blockedReason)
+  const verificationNotice = !blocked && pendingVerification.length
+    ? `建议先完成${pendingVerification.map((key) => artifactLabels[key]).join('、')}，再交付。当前设计仍可导出。`
+    : undefined
 
   function downloadMarkdown() {
     if (!project) return
@@ -97,35 +120,51 @@ export default function ExportButtons() {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={handleZip}
-        disabled={zipping || blocked || !project?.codeFiles.length}
-        title={blocked ? blockedReason : '导出完整工程 ZIP'}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-xl transition-all shadow-lg shadow-slate-900/20 hover:shadow-slate-700/30 hover:-translate-y-0.5 active:translate-y-0"
-      >
-        {zipping ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-        导出 ZIP
-      </button>
-      <button
-        onClick={handlePDF}
-        disabled={pdffing || blocked || !project}
-        title={blocked ? blockedReason : '导出 PDF 方案报告'}
-        className="btn-primary flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-sm text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 active:translate-y-0"
-      >
-        {pdffing ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
-        导出 PDF
-      </button>
-      <button
-        type="button"
-        onClick={downloadMarkdown}
-        disabled={markdowning || blocked || !project}
-        title={blocked ? blockedReason : '导出 Markdown 交付报告'}
-        className="flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {markdowning ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-        导出 Markdown
-      </button>
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleZip}
+          disabled={zipping || blocked || !project?.codeFiles.length}
+          title={blocked ? blockedReason : '导出完整工程 ZIP'}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-xl transition-all shadow-lg shadow-slate-900/20 hover:shadow-slate-700/30 hover:-translate-y-0.5 active:translate-y-0"
+        >
+          {zipping ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          导出 ZIP
+        </button>
+        <button
+          onClick={handlePDF}
+          disabled={pdffing || blocked || !project}
+          title={blocked ? blockedReason : '导出 PDF 方案报告'}
+          className="btn-primary flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-sm text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 active:translate-y-0"
+        >
+          {pdffing ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+          导出 PDF
+        </button>
+        <button
+          type="button"
+          onClick={downloadMarkdown}
+          disabled={markdowning || blocked || !project}
+          title={blocked ? blockedReason : '导出 Markdown 交付报告'}
+          className="flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {markdowning ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+          导出 Markdown
+        </button>
+      </div>
+      {blockedReason ? (
+        <div className="flex max-w-[34rem] items-center gap-1.5 text-right text-[11px] text-red-600 dark:text-red-300" role="status">
+          <AlertCircle size={13} className="shrink-0" />
+          <span>{blockedReason}</span>
+        </div>
+      ) : verificationNotice ? (
+        <div className="flex max-w-[34rem] flex-wrap items-center justify-end gap-x-1.5 gap-y-1 text-right text-[11px] text-amber-700 dark:text-amber-300" role="status">
+          <AlertTriangle size={13} className="shrink-0" />
+          <span>{verificationNotice}</span>
+          <button type="button" onClick={() => navigate('/verification/release')} className="inline-flex items-center gap-0.5 font-semibold hover:underline">
+            去发布检查 <ArrowRight size={11} />
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
