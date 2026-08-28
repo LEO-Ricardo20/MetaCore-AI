@@ -224,7 +224,12 @@ try {
   await cdp.reload()
   await cdp.waitForText('代码与硬件方案一致性')
   await clickText(cdp, '运行一致性检查')
-  await cdp.waitForText('一致性校验')
+  await cdp.waitForExpression(`(() => {
+    const stored = JSON.parse(localStorage.getItem('metacore-projects') || '{}')
+    const active = stored.state?.projects?.find((item) => item.id === stored.state.currentProjectId) ?? stored.state?.projects?.[0]
+    const status = active?.verification?.consistency?.status
+    return Boolean(status && status !== 'idle' && status !== 'running' && ['valid', 'invalid'].includes(active?.artifacts?.consistencyReport?.status))
+  })()`)
   await screenshot(cdp, 'verification.png')
   await clickVisibleTitle(cdp, '查看待处理事项')
   await assertMenuInsideViewport(cdp, '桌面端')

@@ -30,6 +30,7 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 ### Verified
 
 - Added tests for pack loading, formal-pack priority, model aliases, critical component constraints, task-scoped context selection, and explicit missing-coverage behavior.
+- Updated the browser delivery smoke to verify persisted consistency status and artifact state instead of depending on a transient notification string.
 
 ### Previous Unreleased Work
 
