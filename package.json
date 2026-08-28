@@ -1,6 +1,6 @@
 {
   "name": "metacore-studio",
-  "version": "2.5.0-harness.2",
+  "version": "2.6.0",
   "description": "AI-assisted hardware architecture, firmware generation, and local embedded project analysis for ESP32 and STM32",
   "private": true,
   "type": "module",

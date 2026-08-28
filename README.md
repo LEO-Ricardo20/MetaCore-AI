@@ -27,6 +27,7 @@ MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中�
 
 - [功能亮点](#功能亮点)
 - [产品工作流](#产品工作流)
+- [本地硬件知识库](#本地硬件知识库)
 - [ESP32 专精](#esp32-专精)
 - [系统架构](#系统架构)
 - [版本状态](#版本状态)
@@ -60,6 +61,7 @@ MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中�
 | AI 候选选型 | 一键获取最常用/最优/最有性价比/最好四类候选，支持自动选型和确认后一键生成 |
 | 选型权重 | 四类偏好拖动分配 0-100 点，合计严格为 100，并保存选型依据 |
 | ESP32 专精 | 五个常用系列的开发板 profile、正确 board ID / IDF target、Flash/PSRAM/USB/无线能力与 GPIO 约束 |
+| 本地硬件知识库 | Schema v1、来源证据、严格型号解析，以及 8 个 MCU 与 33 个常用教学器件的按需提示词上下文 |
 | 固件生成 | 为 Arduino、PlatformIO、ESP-IDF 和 STM32CubeIDE 生成模块化 C/C++ 工程 |
 | 外设驱动库 | 内置 SSD1306、DHT、AHT20、WS2812、HC-SR04、蜂鸣器、舵机和 DRV8833 模板 |
 | AI 一致性检查 | 生成代码后自动检查代码与硬件方案是否一致 |
@@ -95,6 +97,14 @@ MetaCore Studio 将自然语言硬件需求转化为以项目生命周期为中�
 四类偏好为最常用、最优、最有性价比和最好，使用滑杆分配 0-100 点；拖动任意一项时，其他项会自动重新分配，四项始终合计 100。权重只用于已通过安全门槛的候选排序，不能覆盖电压、电流、热设计、保护、引脚或数据手册约束。确认后点击 `用所选型号生成方案`，系统会把已选型号、权重和安全摘要带入方案提示词。
 
 完整状态机、stale 传播规则和恢复行为见 [`docs/PRODUCT_WORKFLOW.md`](docs/PRODUCT_WORKFLOW.md)。
+
+## 本地硬件知识库
+
+v2.6.0 内置 `metacore.hardware-core@1.0.0` 正式知识包，共 41 个结构化实体。MCU 覆盖 ESP32、ESP32-S3、ESP32-C3、ESP32-C6、ESP32-S2、STM32F103C8T6、STM32F103RBT6 和 STM32F407VGT6；教学器件覆盖 LED、按键、模拟传感器、温湿度/气压/距离/IMU/电流传感器、OLED/LCD、舵机、电机驱动、RTC、MicroSD 和 SPI Flash 等 33 个常见器件。
+
+每个实体记录型号与别名、供电/IO 电平、接口与地址、常见引脚、关键限制、驱动框架和来源。方案生成、代码生成与 AI 一致性检查只会提取当前需求或 BOM 命中的器件摘要，不会把整个资料包塞入提示词；未知型号会明确标记为“本地知识库未收录”，不能静默匹配成相似器件。旧 `CHIP_SPECS` 和驱动模板继续由 `metacore.legacy-core@1.0.0` 兼容，正式知识包拥有更高查询优先级。
+
+当前所有新实体均标记为 `reviewed`：已经过项目内部结构化检查，但不宣称完成逐页人工 `verified`。本版本不包含联网同步、自动下载官方手册或在线按需检索；未收录器件仍可在芯片管理中上传 PDF、AI 助填或手动配置。完整数据模型和扩展规则见 [`docs/KNOWLEDGE_BASE.md`](docs/KNOWLEDGE_BASE.md)。
 
 ## ESP32 专精
 
@@ -139,7 +149,7 @@ flowchart LR
 
 ## 版本状态
 
-当前版本：**v2.5.0-harness.2**，发布日期为 `2026-08-25`。本版本增加 AI 保守候选选型、四类权重可视化和确认后一键生成方案。
+当前版本：**v2.6.0**，发布日期为 `2026-08-28`。本版本完成本地硬件知识库第二阶段：新增 8 个常用 ESP32/STM32 MCU 实体、33 个教学元器件实体、来源与证据元数据、正式包优先级、严格型号解析，以及面向方案/代码生成的按需硬件事实上下文。
 
 2.5.0-harness.1 在保留原有硬件设计、固件生成和本地分析工作台的基础上，增加可切换的 DeepSeek Harness Runtime、Cordis 插件组合、Session/Agent 事件轨迹、受控 MetaCore 工具桥、文件 Diff 审批、构建审批和 Runtime 状态卡片，并统一 AI 网关、设置页 DeepSeek 凭据和 Harness Agent 调用链。Harness 只负责 Agent loop、工具编排和子 Agent；工作区路径、备份、修改时间冲突、构建白名单和最终批准仍由 MetaCore localhost 服务负责。
 
@@ -357,6 +367,9 @@ npm run dev
 src/
 ├── components/          # React UI、页面、编辑器、图表和本地工作区组件
 ├── data/                # 芯片规格、代码模板和驱动模板
+├── knowledge/           # 本地器件知识包、校验、查询和兼容适配
+│   ├── hardwareCorePack.ts # ESP32、STM32 和教学器件正式知识包
+│   └── context.ts       # 需求/BOM 相关事实选择与 AI 上下文生成
 ├── services/            # AI、项目归档、PDF、导出和本地服务客户端
 ├── store/               # Zustand 单一项目状态与其他浏览器状态
 ├── types/               # 硬件、项目和 AI 服务领域类型
@@ -371,6 +384,7 @@ server/
 └── smoke-test.mjs       # 独立本地 API 冒烟测试
 docs/
 ├── ARCHITECTURE.md      # 模块边界与依赖方向
+├── KNOWLEDGE_BASE.md    # 本地器件知识库 Schema、可信状态和扩展规则
 ├── PRODUCT_WORKFLOW.md  # 项目生命周期、阶段和 stale 规则
 ├── AGENT_ARCHITECTURE.md # Agent Runtime、Job、Session 和 Contract
 ├── SECURITY_MODEL.md    # localhost、工作区和凭据安全边界
@@ -424,7 +438,7 @@ npm run verify:delivery
 
 单元测试会验证 AI 结果结构、项目单一状态、项目归档、流程图引用和生成文件路径安全；本地服务测试会创建临时 PlatformIO 风格工程，并验证工作区设置、目录读取、符号链接越界阻止、ESP32 和物联网协议识别、依赖提取、文件写入与备份、报告生成、构建配置检测、AI Chat Completions、Responses API、模型列表和上游错误处理。
 
-当前改造新增覆盖项目生命周期迁移、Artifact stale 传播、Pipeline 取消/重试、AI Task Contract repair、上下文选择、Session/Job/SSE 顺序和日志脱敏。
+当前改造新增覆盖项目生命周期迁移、Artifact stale 传播、Pipeline 取消/重试、AI Task Contract repair、上下文选择、Session/Job/SSE 顺序、日志脱敏，以及知识包加载、优先级、别名解析、关键事实证据和任务相关硬件上下文。
 
 `test:e2e` 使用明确标识的 Deterministic Mock Provider 验证 AI 编排状态机，不代表真实 DeepSeek 调用；`test:e2e:real` 使用仓库内 ESP32 工程验证真实本地分析页面和 PlatformIO 构建；`test:e2e:real-ai` 从隔离的 Chrome 配置副本读取已配置服务，验证硅基流动/官方 DeepSeek 调用和 Harness 只读任务，不会把 API Key 写入项目。其他工程的真实固件编译仍取决于本机 PlatformIO/ESP-IDF/CMake 工具链和依赖是否可用。
 
@@ -478,6 +492,7 @@ npm run dev:server
 
 - 静态分析基于规则，无法完整理解复杂宏、生成代码和所有条件编译路径。
 - 引脚校验依赖识别到的芯片和本地知识库完整度。
+- 本地硬件知识库当前是随版本发布的只读知识包，尚不支持官方资料联网同步或自动差异更新；未收录型号需上传 PDF 或手动补充。
 - Arduino CLI 编译需要明确的开发板 FQBN，目前未作为自动构建配置开放。
 - 生成的硬件设计和固件必须根据真实芯片手册和硬件进行复核。
 - 本项目不能替代电气安全评审、安全审计和硬件在环测试。

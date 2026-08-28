@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ChipSpec } from '@/types/hardware'
-import { CHIP_SPECS } from '@/data/chipSpecs'
+import { getLocalChipNames, getLocalChipSpec } from '@/knowledge/localKnowledge'
 
 interface ChipStoreState {
   /** 用户自定义的芯片列表 */
@@ -47,11 +47,11 @@ export const useChipStore = create<ChipStoreState>()(
         const custom = get().customChips.find((c) => c.name === name)
         if (custom) return custom
         // 再查预置芯片
-        return CHIP_SPECS[name] ?? null
+        return getLocalChipSpec(name)
       },
 
       getAllChipNames: () => {
-        const presetNames = Object.keys(CHIP_SPECS)
+        const presetNames = getLocalChipNames()
         const customNames = get().customChips.map((c) => c.name)
         return [...presetNames, ...customNames]
       },

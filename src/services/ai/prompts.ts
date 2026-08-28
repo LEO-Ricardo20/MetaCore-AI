@@ -8,7 +8,9 @@
 import type { HardwareModelSelection, HardwareScheme } from '@/types/project'
 import type { ChipTarget, ProjectFormat, ChipSpec } from '@/types/hardware'
 import type { Esp32ProjectConfig } from '@/types/esp32'
-import { chipSpecToPromptText, getChipSpec } from '@/data/chipSpecs'
+import { chipSpecToPromptText } from '@/data/chipSpecs'
+import { getLocalChipSpec } from '@/knowledge/localKnowledge'
+import { getLocalHardwareKnowledgeContext } from '@/knowledge/context'
 import { codeTemplateToPromptText } from '@/data/codeTemplates'
 import { matchDriverTemplates, driverTemplatesToPromptText } from '@/data/driverTemplates'
 import { buildCodeContext } from './contextBuilder'
@@ -26,9 +28,10 @@ export interface PromptPair {
 
 /** 生成硬件方案的 prompt（注入芯片规格，约束引脚分配） */
 export function buildSchemePrompt(requirement: string, target: ChipTarget, customSpec?: ChipSpec, esp32?: Esp32ProjectConfig, format: ProjectFormat = 'espidf', modelSelection?: HardwareModelSelection): PromptPair {
-  const spec = customSpec ?? getChipSpec(target)
+  const spec = customSpec ?? getLocalChipSpec(target)
   const chipText = spec ? chipSpecToPromptText(spec) : `目标芯片：${target}（无详细规格数据）`
   const boardText = esp32 ? esp32ConfigToPromptText(esp32, format) : ''
+  const hardwareKnowledgeText = getLocalHardwareKnowledgeContext(requirement, target)
 
   return {
     system: `你是一位资深嵌入式硬件架构工程师，负责输出可以被程序校验、被工程师复核的硬件方案。你必须区分“芯片资料中已确认的事实”和“根据需求做出的假设”，不能用常识替代缺失的芯片资料。
@@ -49,6 +52,8 @@ export function buildSchemePrompt(requirement: string, target: ChipTarget, custo
 ${chipText}
 
 ${boardText}
+
+${hardwareKnowledgeText}
 
 ## 型号确认闸门（不可跳过）
 - 已提交 modelSelection 时，其中每个 selectedModel 和 selectedAnswer 都是硬约束；不得静默替换、降级或改成另一个封装/模组。
@@ -146,10 +151,11 @@ export const SCHEME_PROMPT = (requirement: string, target: ChipTarget): string =
 
 /** 生成工程代码的 prompt（注入芯片规格 + 代码模板） */
 export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, format: ProjectFormat, customSpec?: ChipSpec, esp32?: Esp32ProjectConfig): PromptPair {
-  const spec = customSpec ?? getChipSpec(target)
+  const spec = customSpec ?? getLocalChipSpec(target)
   const chipText = spec ? chipSpecToPromptText(spec) : `目标芯片：${target}`
   const templateText = codeTemplateToPromptText(format, esp32)
   const boardText = esp32 ? esp32ConfigToPromptText(esp32, format) : ''
+  const hardwareKnowledgeText = getLocalHardwareKnowledgeContext(JSON.stringify(scheme), target, scheme)
   const matchedDrivers = matchDriverTemplates(scheme)
   const driverText = driverTemplatesToPromptText(matchedDrivers, format)
 
@@ -179,6 +185,8 @@ export function buildCodegenPrompt(scheme: HardwareScheme, target: ChipTarget, f
 ${chipText}
 
 ${boardText}
+
+${hardwareKnowledgeText}
 
 ${templateText}
 
@@ -322,11 +330,15 @@ ${projectContext || '暂无项目上下文，请先在「需求生成」页创�
 /** 代码与方案一致性验证 prompt */
 export function buildVerifyPrompt(
   scheme: HardwareScheme,
-  files: { path: string; content: string }[]
+  files: { path: string; content: string }[],
+  target: ChipTarget = '未知目标',
 ): string {
   const keywords = scheme.pins.flatMap((pin) => [pin.pinNumber, pin.pinName, pin.function, pin.connectedTo])
   const context = buildCodeContext(files, { tokenBudget: 14_000, keywords: [...keywords, 'gpio', 'pin', 'init', 'setup', 'error', 'i2c', 'spi', 'uart'] })
+  const hardwareKnowledgeText = getLocalHardwareKnowledgeContext(JSON.stringify(scheme), target, scheme)
   return `请作为严格的代码审查员，逐项核对以下代码与硬件方案的一致性。只依据提供的方案和真实代码证据判断，不要因为字符串出现就判定已实现。
+
+${hardwareKnowledgeText}
 
 硬件方案引脚分配：
 ${scheme.pins.map(p => `${p.pinNumber} -> ${p.function} -> ${p.connectedTo}`).join('\n')}

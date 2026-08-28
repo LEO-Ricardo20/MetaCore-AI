@@ -30,7 +30,7 @@ export async function runCodegen(
   let warning: string | undefined
   try {
     const verifyResult = await callTaskContract(svc, 'code-consistency', [
-      { role: 'user', content: buildVerifyPrompt(project.scheme, files) }
+      { role: 'user', content: buildVerifyPrompt(project.scheme, files, project.target) }
     ], parseVerification, { temperature: 0.1, signal: options.signal })
     const v = verifyResult.contract.data
     if (!v.consistent && v.issues.length > 0) {

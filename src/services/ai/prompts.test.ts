@@ -19,6 +19,8 @@ describe('AI prompt contracts', () => {
     expect(prompt.system).toContain('不得悄悄换成其他芯片、模组、开发板、封装或低价替代品')
     expect(prompt.user).toContain('AI 候选阶段已选定的完整型号')
     expect(prompt.user).toContain('只输出 JSON')
+    expect(prompt.system).toContain('本地硬件知识库事实')
+    expect(prompt.system).toContain('metacore.hardware-core@1.0.0')
   })
 
   it('prevents firmware generation from changing the approved hardware map', () => {
@@ -27,6 +29,7 @@ describe('AI prompt contracts', () => {
     expect(prompt.system).toContain('不得使用未声明的函数、类型、变量、库、占位符')
     expect(prompt.user).toContain('禁止重新分配')
     expect(prompt.user).toContain('文件路径唯一且安全')
+    expect(prompt.system).toContain('本地硬件知识库事实')
   })
 
   it('requires flow graph evidence and valid graph references', () => {
@@ -38,11 +41,12 @@ describe('AI prompt contracts', () => {
   })
 
   it('requires evidence-backed consistency verification', () => {
-    const prompt = buildVerifyPrompt(scheme, [{ path: 'main.c', content: 'void setup(void) {}\n' }])
+    const prompt = buildVerifyPrompt(scheme, [{ path: 'main.c', content: 'void setup(void) {}\n' }], 'ESP32')
     expect(prompt).toContain('无法确认时标记 warning')
     expect(prompt).toContain('consistent 只有在没有 error 和 warning 时才能为 true')
     expect(prompt).toContain('真实文件路径和行号证据')
     expect(prompt).toContain('I2C/SPI/UART/CAN')
+    expect(prompt).toContain('本地硬件知识库事实')
   })
 
   it('does not allow invented chip defaults when parsing a datasheet', () => {

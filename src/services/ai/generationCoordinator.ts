@@ -423,7 +423,7 @@ export async function startGeneration(input: StartInput) {
       completeStage(run?.id ?? null, 'code', '固件工程已生成')
       activeStage = 'code-validation'
       updateStage(run?.id ?? null, 'code-validation', 90, '正在校验代码与方案一致性')
-      const verifyPrompt = buildVerifyPrompt(codeProject.scheme!, codeContract.data)
+      const verifyPrompt = buildVerifyPrompt(codeProject.scheme!, codeContract.data, codeProject.target)
       const verifyContract = await runAgentStage('code-validation', svc, [{ role: 'user', content: verifyPrompt }], sessionId, signal, parseVerification, (progress, message) => updateStage(run?.id ?? null, 'code-validation', Math.max(90, progress), message, { model: svc.model, provider: svc.provider }), 0.1)
       const warning = !verifyContract.data.consistent && verifyContract.data.issues.length > 0 ? `AI 自检发现 ${verifyContract.data.issues.length} 个潜在问题：\n${verifyContract.data.issues.map((issue) => issue.message).join('\n')}` : undefined
       useGenerationStore.getState().update({ warning })

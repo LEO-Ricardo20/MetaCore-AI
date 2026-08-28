@@ -8,7 +8,9 @@ MetaCore Studio 由 React 浏览器应用和 Node.js localhost 服务组成。�
 flowchart LR
     User[用户] --> UI[React + TypeScript UI]
     UI --> Store[Zustand Project Schema v3]
+    UI --> Knowledge[Local Knowledge Base]
     UI --> AIFlow[AI Task Contract + Context Builder]
+    Knowledge --> AIFlow
     UI --> Local[Node.js localhost service]
     Local --> Agent[Agent Runtime Manager]
     Agent --> Registry[Plugin / Service / Tool Registry]
@@ -59,6 +61,7 @@ src/
 │   ├── local/           # localhost API 和 SSE 客户端
 │   ├── esp32/           # 板卡配置规范化、工具链与 GPIO 校验
 │   └── projects/        # 生命周期和可移植项目归档
+├── knowledge/           # 本地器件知识包、校验、注册表和兼容适配
 ├── store/               # Zustand 持久化与会话状态
 ├── types/               # Project、Agent、AI 和硬件共享类型
 └── data/                # 芯片、驱动和模板静态知识
@@ -69,6 +72,7 @@ src/
 - 路由页可以依赖领域组件、Store、Service、配置和共享类型。
 - Service 和 Store 不依赖路由页。
 - AI 结构化输出必须先经过 Contract 和任务专用验证器，不能直接进入 Store。
+- 芯片、板卡和元器件事实必须通过本地知识库查询，生成流程不能把模糊搜索结果当成已解析型号。
 - 项目导入必须先经过 `portableProject.ts` 可信边界。
 - 页面按钮和一键流水线复用同一套 AI workflow service，不在组件中复制 Provider 调用与解析逻辑。
 
@@ -88,6 +92,16 @@ src/
 Zustand `metacore-projects` 的持久化版本升级为 3。迁移会补齐生命周期字段，并为旧 ESP32 项目推断兼容的默认开发板 profile，不清空旧 localStorage。
 
 详细行为见 [PRODUCT_WORKFLOW.md](./PRODUCT_WORKFLOW.md)。
+
+## 本地器件知识库
+
+`src/types/knowledge.ts` 定义知识库 Schema v1；`src/knowledge` 实现知识包校验、原子安装、冲突与依赖检查、查询、严格型号解析和版本快照。
+
+知识实体由身份、结构化事实、引脚、接口、约束、关系、驱动和来源证据组成。关键事实必须有证据；`verified` 实体必须引用厂商官方来源。UI 模糊搜索与生成流程的严格解析是两个不同入口，未知型号不能静默匹配到相似芯片。
+
+当前同时安装两个只读知识包：`metacore.legacy-core@1.0.0` 提供历史数据兼容；`metacore.hardware-core@1.0.0` 提供 8 个 ESP32/STM32 MCU 实体和 33 个教学元器件实体。正式包优先级高于 legacy 包，但使用独立实体 ID，旧项目目标名称继续通过别名兼容。
+
+`src/knowledge/context.ts` 严格解析目标芯片，从需求、BOM 和方案文本匹配器件别名，并只向方案、代码生成和 AI 一致性检查提示词注入当前任务相关的电压、IO、电流、接口、地址、限制、驱动和来源摘要。未匹配器件会明确标记为未收录，不能通过模糊搜索静默替代。当前实体统一为 `reviewed`；联网官方同步和按需文档检索尚未启用。详细模型、可信状态和扩展规则见 [KNOWLEDGE_BASE.md](./KNOWLEDGE_BASE.md)。
 
 ## AI 可信边界
 
@@ -181,7 +195,7 @@ Session Root 默认位于操作系统用户数据目录，而不是用户工程�
 {
   "kind": "metacore.project",
   "schemaVersion": 1,
-   "appVersion": "2.5.0-harness.2",
+   "appVersion": "2.6.0",
   "exportedAt": "ISO-8601",
   "project": {}
 }

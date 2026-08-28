@@ -6,6 +6,33 @@ The project follows [Semantic Versioning](https://semver.org/). Dates use `YYYY-
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-28
+
+### Added
+
+- Added Knowledge Schema v1 integration with evidence metadata, pack validation, atomic installation, dependency checks, snapshots, fuzzy search, and strict model/alias resolution.
+- Added `metacore.hardware-core@1.0.0` with 41 reviewed entities: 8 common ESP32/STM32 MCU entities and 33 common teaching-component entities.
+- Added structured supply, IO, current, interface, address, pin, constraint, driver-framework, and source fields for common sensors, displays, actuators, motor drivers, RTC, MicroSD, and SPI flash.
+- Added task-scoped local hardware context lookup for scheme generation, firmware generation, and AI consistency verification. Only requirement/BOM-matched facts are injected, while unlisted parts are reported explicitly.
+
+### Changed
+
+- Added knowledge-pack priority so the formal hardware pack wins exact alias ties over `metacore.legacy-core@1.0.0` without reusing legacy entity IDs.
+- Routed preset chip lookup, the chip store, scheme prompts, and code-generation prompts through the local knowledge base while preserving custom-chip precedence and existing project compatibility.
+- Updated the application version, Chinese and English README, architecture guide, local API examples, and in-app release metadata to v2.6.0.
+
+### Compatibility and Scope
+
+- Preserved existing chip targets, driver templates, browser storage, project archives, PDF upload, AI-assisted custom-chip entry, and manual chip entry.
+- All new hardware entities are `reviewed`, not `verified`; the release does not claim page-by-page official-document verification.
+- Official-source synchronization, document caching, network updates, and online on-demand retrieval are intentionally not included in this release.
+
+### Verified
+
+- Added tests for pack loading, formal-pack priority, model aliases, critical component constraints, task-scoped context selection, and explicit missing-coverage behavior.
+
+### Previous Unreleased Work
+
 ### Added
 
 - Added an AI hardware candidate flow with four user-visible categories: most common, optimal match, best value, and best overall.

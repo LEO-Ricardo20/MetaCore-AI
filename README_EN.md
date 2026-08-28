@@ -31,6 +31,7 @@ The browser application handles the product interface and AI workflows. An optio
 
 - [Highlights](#highlights)
 - [Architecture](#architecture)
+- [Local Hardware Knowledge Base](#local-hardware-knowledge-base)
 - [ESP32 Specialization](#esp32-specialization)
 - [Release Status](#release-status)
 - [Sponsor](#sponsor)
@@ -60,6 +61,7 @@ The browser application handles the product interface and AI workflows. An optio
 | AI candidate selection | Four conservative candidate categories, safety gates, weighted preferences, and confirmed model selection |
 | Preference budget | A strict 100-point allocation across common, optimal, value, and best options |
 | ESP32 specialization | Five board-aware family profiles with correct PlatformIO/IDF targets, storage, USB, radio, and GPIO policy |
+| Local hardware knowledge | Schema v1, evidence metadata, strict model resolution, and task-scoped facts for 8 MCU and 33 teaching-component entities |
 | Firmware generation | Modular C/C++ project generation for Arduino, PlatformIO, ESP-IDF, and STM32CubeIDE |
 | Driver library | Built-in templates for SSD1306, DHT, AHT20, WS2812, HC-SR04, buzzer, servo, and DRV8833 |
 | AI verification | Post-generation consistency checks against the selected hardware scheme |
@@ -88,6 +90,14 @@ flowchart LR
 
 The localhost service provides the local AI proxy and the `本地` workspace boundary. Requirement generation, chip management, code generation, flow graphs, and export can run in the browser, but the local proxy is recommended for AI providers that do not allow browser CORS.
 
+## Local Hardware Knowledge Base
+
+Version 2.6.0 ships `metacore.hardware-core@1.0.0` with 41 structured entities. MCU coverage includes ESP32, ESP32-S3, ESP32-C3, ESP32-C6, ESP32-S2, STM32F103C8T6, STM32F103RBT6, and STM32F407VGT6. The 33 teaching-component entries cover basic LEDs and inputs, common environmental and motion sensors, distance and power monitors, OLED/LCD modules, servo and motor drivers, RTC, MicroSD, and SPI NOR flash.
+
+Entities carry aliases, supply and IO facts, interfaces, addresses, common pins, constraints, driver-framework hints, and source references. Scheme, firmware, and AI consistency-verification prompts receive only facts matched to the current requirement or BOM. Unknown models are explicitly reported as absent instead of being silently replaced with a similar part. The higher-priority formal pack coexists with the legacy compatibility pack.
+
+All new entries are currently marked `reviewed`, not `verified`: they passed internal structural review but do not claim page-by-page manual verification. Network synchronization, automatic official-document downloads, and online retrieval are not enabled in this release. Unlisted devices can still use PDF upload, AI-assisted entry, or manual chip configuration. See [`docs/KNOWLEDGE_BASE.md`](docs/KNOWLEDGE_BASE.md).
+
 ## ESP32 Specialization
 
 Version 2.4.0 separates the SoC family, module, development board, and build identifier instead of treating all of them as a single chip name:
@@ -106,7 +116,7 @@ See [`docs/ESP32_SPECIALIZATION.md`](docs/ESP32_SPECIALIZATION.md) for the famil
 
 ## Release Status
 
-Current release: **v2.5.0-harness.2** (`2026-08-25`). This release adds conservative AI candidate selection, a four-way 100-point preference view, model confirmation evidence, one-click scheme generation from selected models, and the integrated DeepSeek Harness Runtime.
+Current release: **v2.6.0** (`2026-08-28`). This release completes the local hardware knowledge-base phase with 8 common ESP32/STM32 MCU entities, 33 teaching-component entities, source/evidence metadata, strict model resolution, formal-pack priority, and task-scoped hardware facts for scheme and firmware generation.
 
 Version 2.4.0 introduces board-aware ESP32 specialization for ESP32, S3, C3, C6, and S2. Projects now retain the exact PlatformIO board, ESP-IDF target, Flash, PSRAM, USB, radio, partition, upload, and monitor configuration; prompt skeletons no longer hard-code `esp32dev`, and board-level GPIO policy runs after scheme generation. The complete Mock workflow was verified with ESP32-C3, while the repository's classic ESP32 example was scanned and built with the real PlatformIO toolchain. Mock results are not presented as real DeepSeek calls, and a successful build does not imply a physical board was flashed.
 
@@ -274,6 +284,9 @@ The real-workspace browser smoke opens the verification workspace, clicks Scan, 
 src/
 ├── components/          # React UI, pages, editors, diagrams, and local workspace panels
 ├── data/                # Chip specifications, code templates, and driver templates
+├── knowledge/           # Local hardware knowledge packs, validation, lookup, and compatibility adapters
+│   ├── hardwareCorePack.ts # Formal ESP32, STM32, and teaching-component pack
+│   └── context.ts       # Requirement/BOM matching and prompt-context selection
 ├── services/            # AI, project archives, PDF, export, and local-service clients
 ├── store/               # Canonical project state and other browser stores
 ├── types/               # Domain types for hardware, projects, and AI services
@@ -288,6 +301,7 @@ server/
 └── smoke-test.mjs       # Self-contained local API smoke test
 docs/
 ├── ARCHITECTURE.md      # Module boundaries and dependency direction
+├── KNOWLEDGE_BASE.md    # Local knowledge schema, trust states, and extension rules
 ├── LOCAL_API.md         # Local service API reference
 └── PROJECT_FILES.md     # Portable project format and safety limits
 examples/
@@ -384,6 +398,7 @@ The project marker may exist, but the corresponding tool is not available in `PA
 
 - Static analysis is rule-based and cannot fully understand complex macros, generated code, or every conditional compilation path.
 - Pin validation depends on the detected chip and the available local knowledge base.
+- The local hardware knowledge base is currently shipped as read-only release data; official-source synchronization and automatic online updates are not enabled yet. Use PDF upload or manual entry for unlisted parts.
 - Arduino CLI compilation requires an explicit board FQBN and is not enabled as an automatic build profile yet.
 - Generated hardware designs and firmware must be reviewed against the actual datasheet and hardware.
 - This project does not replace electrical safety review, security review, or hardware-in-the-loop testing.
